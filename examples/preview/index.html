@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Herdr Preview · 인터랙션 테스트</title>
+<link rel="stylesheet" href="style.css">
+<main>
+  <div class="eyebrow"><span></span> LIVE PREVIEW</div>
+  <h1>만들면서,<br>바로 확인하세요.</h1>
+  <p class="intro">지금 이 페이지는 Herdr 안의 실제 웹뷰입니다.<br>다른 창을 열지 않고 작업 결과를 확인할 수 있어요.</p>
+  <section class="card">
+    <div class="card-title"><img src="icon.svg" alt=""><h2>직접 눌러보세요</h2></div>
+    <label for="name">이름</label>
+    <input id="name" placeholder="한글도 입력할 수 있어요" autocomplete="off">
+    <div id="greeting" aria-live="polite">이름을 입력하면 이곳에 표시됩니다.</div>
+    <button id="counter">버튼 클릭 <strong id="count">0</strong></button>
+    <div class="caption">HTML · CSS · JavaScript가 그대로 동작합니다.</div>
+  </section>
+  <footer>작업 → Preview → 수정 → 바로 확인</footer>
+</main>
+<script src="app.js"></script>
+</html>

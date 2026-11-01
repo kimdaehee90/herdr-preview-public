@@ -1,0 +1,12 @@
+/target
+/dist
+/.brain
+/AGENTS.local.md
+/.build-tools
+/.preview-test
+/.browser-test
+/output
+/reviews
+/.grok-review
+/.personal-update
+/.public-build

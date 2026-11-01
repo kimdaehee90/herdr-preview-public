@@ -1,0 +1,124 @@
+#!/bin/bash
+# Installs a personal Preview build beside Herdr; never replaces its app/CLI.
+set -euo pipefail
+[[ $(uname -s) == Darwin ]] || { echo 'This build requires macOS.' >&2; exit 1; }
+cd "$(dirname "$0")/.."
+case "${1:-}" in
+  '') cargo build --release --locked --features personal-preview ;;
+  --validated) ;;
+  *) echo 'Usage: scripts/install-preview-macos [--validated]' >&2; exit 2 ;;
+esac
+python3 - "$PWD" "${1:-}" <<'PY'
+from pathlib import Path
+import fcntl, importlib.util, json, os, plistlib, shutil, tempfile, uuid
+import subprocess, sys
+
+root = Path(sys.argv[1])
+user = Path.home()
+app = user / 'Applications' / 'Herdr Preview.app'
+config = user / '.config' / 'herdr-preview'
+original = user / '.config' / 'herdr-app'
+candidate = root / 'target/release/herdr-app'
+identity = json.loads(subprocess.check_output([str(candidate), '--personal-build-info']))
+policy = json.loads((root / 'personal-build.json').read_text())
+if identity.get('protected') is not True or identity.get('bundle_id') != policy['bundle_id'] or identity.get('config_home') != policy['config_home']:
+    raise RuntimeError('Refusing to install an unprotected or differently identified build')
+commands = json.loads(subprocess.check_output([str(candidate), 'commands']))
+missing = set(policy['required_commands']) - {c['name'] for c in commands}
+if missing: raise RuntimeError(f'Personal features missing: {sorted(missing)}')
+spec = importlib.util.spec_from_file_location('personal_update',root/'scripts/personal-update.py')
+updates = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(updates)
+updates.verify_sources(root)
+head = subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
+dirty = bool(subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True).strip())
+if sys.argv[2] == '--validated':
+    import hashlib
+    validation = json.loads((root / '.personal-update/validated.json').read_text())
+    if dirty or validation.get('head') != head or not validation.get('native_ui_checks_passed') or validation.get('binary_sha256') != hashlib.sha256(candidate.read_bytes()).hexdigest():
+        raise RuntimeError('Source/binary changed or native UI validation has not passed')
+cli = user / '.local' / 'bin' / 'herdr-preview'
+if cli.exists() and 'HerdrPreview' not in cli.read_text():
+    raise RuntimeError(f'An unrelated command already exists: {cli}')
+if app.exists():
+    old_info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    if old_info.get('CFBundleIdentifier') != policy['bundle_id']:
+        raise RuntimeError('Refusing to replace an unrelated app')
+app.parent.mkdir(parents=True, exist_ok=True)
+lock = (app.parent / '.herdr-preview-install.lock').open('a')
+fcntl.flock(lock, fcntl.LOCK_EX)
+saved = json.loads(subprocess.check_output([sys.executable,str(root/'scripts/personal-update.py'),'backup'],cwd=root,text=True))
+backup = saved['backup']
+config.mkdir(parents=True, exist_ok=True)
+stage = Path(tempfile.mkdtemp(prefix='.HerdrPreview-stage-',dir=app.parent))
+staged_app = stage / app.name
+binary = staged_app / 'Contents/MacOS/HerdrPreview'
+resources = staged_app / 'Contents/Resources'
+binary.parent.mkdir(parents=True)
+resources.mkdir(parents=True)
+
+# Keep a running copy valid until the person chooses to close it.
+shutil.copy2(candidate, binary)
+binary.chmod(0o755)
+shutil.copy2(root / 'assets' / 'icons' / 'Herdr.icns', resources / 'Herdr.icns')
+for notice in ('LICENSE', 'THIRD-PARTY-NOTICES'):
+    shutil.copy2(root / notice, resources / notice)
+
+for name in ('settings.json', 'keys.json', 'programs.json', 'installed.json', 'view.json'):
+    source, destination = original / name, config / name
+    if source.exists() and not destination.exists(): shutil.copy2(source, destination)
+for name in ('mods', 'layouts', 'data', 'fonts'):
+    source, destination = original / name, config / name
+    if source.is_dir() and not destination.exists(): shutil.copytree(source, destination)
+if not (config / 'shared.json').exists():
+    shared = json.loads((original / 'shared.json').read_text()) if (original / 'shared.json').exists() else {}
+    shared.update({'layout': 'main', 'frame.welcomed': 'finished'})
+    shared['workspace.panels'] = list(dict.fromkeys([*shared.get('workspace.panels', ['files', 'changes']), 'preview']))
+    (config / 'shared.json').write_text(json.dumps(shared, ensure_ascii=False, indent=2) + '\n')
+
+info = {
+    'CFBundleExecutable': 'HerdrPreview', 'CFBundleIdentifier': 'dev.herdr.preview',
+    'CFBundleName': 'Herdr Preview', 'CFBundleDisplayName': 'Herdr Preview',
+    'CFBundleIconFile': 'Herdr', 'CFBundlePackageType': 'APPL',
+    'CFBundleShortVersionString': identity['version'], 'CFBundleVersion': identity['version'],
+    'NSPrincipalClass': 'NSApplication', 'NSHighResolutionCapable': True,
+    'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True, 'NSAllowsArbitraryLoadsInWebContent': True},
+    'LSEnvironment': {
+        'HERDR_APP_HOME': str(config), 'HERDR_APP_ID': 'herdr-preview',
+        'HERDR_PREVIEW_TEST_CONTROL': '0',
+        'PATH': f'{user}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+    },
+}
+record = {'schema':1,'source_head':head,'source_dirty':dirty,'source_root':str(root),'backup':backup,'identity':identity}
+(resources/'PersonalBuild.json').write_text(json.dumps(record,indent=2)+'\n')
+with (staged_app / 'Contents' / 'Info.plist').open('wb') as output: plistlib.dump(info, output)
+subprocess.run(['codesign', '--force', '--sign', '-', str(staged_app)], check=True)
+subprocess.run(['codesign', '--verify', '--deep', '--strict', str(staged_app)], check=True)
+previous = app.with_name('.HerdrPreview-previous-' + uuid.uuid4().hex[:8] + '.app')
+try:
+    if app.exists(): app.rename(previous)
+    staged_app.rename(app)
+except BaseException:
+    if previous.exists() and not app.exists(): previous.rename(app)
+    raise
+finally:
+    shutil.rmtree(stage,ignore_errors=True)
+# The old process may still map this executable and load bundle resources.
+# Retain its complete bundle for rollback; never delete a potentially live app.
+if previous.exists():
+    (Path(backup)/'previous-bundle.json').write_text(json.dumps({'path':str(previous),'cleanup':'Only remove after this GUI process has exited; never stop the shared core.'},indent=2)+'\n')
+subprocess.run(['/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', '-f', str(app)], check=True)
+
+cli.parent.mkdir(parents=True, exist_ok=True)
+wrapper = cli.with_name('.herdr-preview-' + uuid.uuid4().hex[:8])
+wrapper.write_text('#!/bin/sh\nexport HERDR_APP_HOME="$HOME/.config/herdr-preview"\nexport HERDR_APP_ID="herdr-preview"\nexport HERDR_PREVIEW_TEST_CONTROL=0\nexec "$HOME/Applications/Herdr Preview.app/Contents/MacOS/HerdrPreview" "$@"\n')
+wrapper.chmod(0o755)
+wrapper.replace(cli)
+print(f'Installed {app}')
+print(f'Configuration: {config}')
+print(f'CLI: {cli}')
+print(f'Previous app/source/settings backup: {backup}')
+if previous.exists():
+    print(f'Previous bundle retained: {previous}')
+    print('Any already-open window still runs the previous build. Quit and reopen only Herdr Preview to activate this update.')
+PY

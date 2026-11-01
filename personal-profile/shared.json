@@ -1,0 +1,12 @@
+{
+  "layout": "personal-main",
+  "workspace.panels": [
+    "files",
+    "changes",
+    "preview",
+    "browser"
+  ],
+  "frame.welcomed": "finished",
+  "sidebar.width": 204,
+  "sidebar.collapsed": true
+}

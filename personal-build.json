@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "bundle_id": "dev.herdr.preview",
+  "config_home": "~/.config/herdr-preview",
+  "feature": "personal-preview",
+  "required_commands": ["preview.open", "preview.reload", "preview.view", "browser.open", "browser.view", "browser.read", "browser.click", "browser.fill", "browser.upload", "browser.scroll", "browser.screenshot"],
+  "required_sources": ["src/preview.rs", "src/preview/macos.rs", "src/preview/browser.js", "src/preview/page-width.js", "src/preview/automation.rs", "src/preview/server.rs", "scripts/browser-smoke.py", "scripts/browser-focus-smoke.py", "scripts/preview-smoke.py", "defaults/mods/agents-personal/main.js", "defaults/mods/agents-personal/agent-list.js", "defaults/mods/workspace-status-personal/main.js"]
+}

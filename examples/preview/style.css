@@ -1,0 +1,12 @@
+:root {font-family:Pretendard,-apple-system,sans-serif;color:#182522;background:#f3f6f3;font-synthesis:none}
+*{box-sizing:border-box} body{margin:0} main{max-width:620px;margin:auto;padding:44px 28px 60px}
+.eyebrow{display:flex;gap:8px;align-items:center;color:#47705d;font-size:11px;font-weight:700;letter-spacing:.14em}
+.eyebrow span{width:7px;height:7px;border-radius:50%;background:#558767}
+h1{font-size:clamp(32px,6vw,49px);line-height:1.2;letter-spacing:-.055em;margin:24px 0 18px;font-weight:750}
+.intro{font-size:14px;line-height:1.85;color:#68756c;margin-bottom:30px;word-break:keep-all}
+.card{background:white;border:1px solid #dde5df;border-radius:18px;padding:25px;box-shadow:0 8px 28px #183d2107}
+.card-title{display:flex;gap:10px;align-items:center;margin-bottom:24px}.card-title img{width:26px;height:26px}h2{font-size:17px;letter-spacing:-.03em;margin:0}
+label{display:block;font-size:12px;font-weight:650;margin-bottom:8px}input{width:100%;border:1px solid #dce2dd;border-radius:9px;padding:13px 12px;font:inherit;font-size:14px;color:inherit;outline:none}
+input:focus{border-color:#6a8d71;box-shadow:0 0 0 3px #5e84691a}#greeting{font-size:12px;min-height:40px;padding:10px 1px;color:#6f7c73;overflow-wrap:anywhere}
+button{display:flex;justify-content:space-between;align-items:center;background:#254f3d;color:white;width:100%;border:0;border-radius:9px;padding:14px 16px;font:inherit;font-size:14px;cursor:pointer;transition:background .15s}button:hover{background:#32634d}button:active{transform:translateY(1px)}button strong{background:#ffffff1c;border-radius:5px;padding:2px 9px}
+.caption{font-size:11px;color:#8a958e;text-align:center;margin-top:16px}footer{font-size:11px;color:#8b978f;text-align:center;margin-top:30px}
