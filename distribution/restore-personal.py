@@ -186,6 +186,9 @@ def install(root, home, core=None, dry_run=False, native=True, register=True):
                         original.update(json.loads(source.read_text()))
                         if name=='settings.json':original['core']=str(core)
                         write_json(target,original)
+                    elif name=='browser.json' and target.exists():
+                        # Existing page tabs and URLs belong to this Mac, not the portable defaults.
+                        continue
                     else:
                         temporary_file=target.with_name('.'+target.name+'-'+uuid.uuid4().hex[:8])
                         shutil.copy2(source,temporary_file);temporary_file.replace(target)

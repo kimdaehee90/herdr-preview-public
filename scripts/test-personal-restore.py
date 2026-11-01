@@ -59,6 +59,13 @@ class Restore(unittest.TestCase):
         self.assertTrue((Path(result['backup'])/'previous-settings.tar.gz').is_file())
         self.assertIn('$HOME',(self.home/'.local/bin/herdr-preview').read_text())
 
+    def test_update_preserves_existing_browser_tab_state(self):
+        config=self.home/'.config/herdr-preview';config.mkdir(parents=True)
+        state={'browser':'https://example.test/draft','_tabs':{'browser-space':{'order':['view-one','view-two'],'active':'view-two'}},'view-two':'https://example.test/second'}
+        (config/'browser.json').write_text(json.dumps(state))
+        self.install()
+        self.assertEqual(json.loads((config/'browser.json').read_text()),state)
+
     def test_corrupt_app_and_profile_refused_before_mutation(self):
         self.package.write_bytes(b'corrupt')
         with self.assertRaisesRegex(RuntimeError,'checksum'):self.install()
