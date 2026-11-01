@@ -81,6 +81,10 @@ programs without OSC 7501 reports (for example Grok). They appear under
 program registry and removes the row when the process exits or returns to a shell.
 The core's reports and the `agents()` API are unchanged; a real report takes
 precedence. The live personal layout may be `personal-main`.
+New GUI terminals set `NO_COLOR` to an empty string so a core started by an
+agent/installer with `NO_COLOR=1` doesn't suppress their ANSI colors. Existing
+programs retain their original environment; restart them only when the person
+is ready. Terminal colors are independent of remote screen synchronization.
 
 Personal installs build with `personal-preview`: official app-binary replacement
 is blocked at compile time, including inherited release-server settings.

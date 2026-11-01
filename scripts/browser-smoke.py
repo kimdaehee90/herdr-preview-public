@@ -127,7 +127,7 @@ def read_ready():
 def ref(data,label):return next(el['ref'] for el in data['elements'] if el['label']==label)
 def start():
  global process
- env=os.environ.copy();env.update({'HERDR_APP_HOME':str(home),'HC_SESSION':args.session,'HERDR_APP_ID':'herdr-browser-test','HERDR_PREVIEW_TEST_CONTROL':'1','PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:'+env['PATH']})
+ env=os.environ.copy();env.update({'HERDR_APP_HOME':str(home),'HC_SESSION':args.session,'HERDR_APP_ID':'herdr-browser-test','HERDR_PREVIEW_TEST_CONTROL':'1','NO_COLOR':'1','PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:'+env['PATH']})
  log=(home.parent/'app.log').open('ab')
  process=subprocess.Popen([str(binary)],env=env,stdout=log,stderr=log)
  (home.parent/'app.pid').write_text(str(process.pid))
@@ -136,6 +136,12 @@ def start():
 start()
 try:
  space=wait(lambda:do('space.new',name='Browser 검증',folder=str(root/'examples/preview')).get('space'),'Test core layout did not connect')
+ probe=do('terminal.open',argv=['/bin/sh','-c','if [ -n "${NO_COLOR:-}" ]; then printf "HERDR_COLOR_SUPPRESSED\\n"; else printf "HERDR_COLOR_ENABLED\\n"; fi'],place='tab',name='Color inheritance')
+ def color_ready():
+  output=subprocess.check_output([str(Path.home()/'.local/bin/hc'),'read',probe['terminal'],'--lines','8'],env={**os.environ,'HC_SESSION':args.session},text=True)
+  return 'HERDR_COLOR_ENABLED' in output and 'HERDR_COLOR_SUPPRESSED' not in output
+ wait(color_ready,'GUI terminal inherited NO_COLOR from an agent-started core')
+ passed('New GUI terminals restore ANSI colors even when their core inherited NO_COLOR=1')
  do('browser.open',url=url+'wide')
  do('browser.view',zoom=1.0,fit=True,mobile=False)
  def fitted():

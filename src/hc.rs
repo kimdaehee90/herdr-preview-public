@@ -389,7 +389,12 @@ impl Core {
     /// Starts a program in a new core terminal and returns its address (`tN`).
     /// Starts a terminal, here or on another machine (`on`: its name in `hc machine ls`).
     pub fn run(&self, argv: Vec<String>, cwd: Option<String>, labels: Value, on: Option<&str>) -> Result<String> {
-        let env = json!({"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "herdr"});
+        // An agent/installer can start the core with NO_COLOR=1 for its own
+        // machine-readable commands. GUI terminals have a real color display;
+        // don't let that inherited setting silently disable their ANSI output.
+        // Empty follows the NO_COLOR convention and works with existing cores'
+        // string-only environment overlay, without restarting their terminals.
+        let env = json!({"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "herdr", "NO_COLOR": ""});
         let r = self.call("terminal.run", json!({"argv": argv, "cwd": cwd, "env": env, "labels": labels, "on": on, "keep": true}))?;
         r.get("address")
             .and_then(Value::as_str)
