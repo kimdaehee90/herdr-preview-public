@@ -1,51 +1,81 @@
 # Herdr Preview · Browser
 
-Apple Silicon 맥북에서 Preview와 Browser를 함께 사용하는 Herdr 개인 확장 빌드입니다.
-원본은 [herdrdev/herdr-app](https://github.com/herdrdev/herdr-app)이며 이 저장소는 독립 배포본입니다.
-기존 원본 앱과 별도로 **Herdr Preview**를 설치합니다.
+터미널 옆에서 작업 결과를 미리 보고 웹사이트를 조작할 수 있는 Herdr 확장 버전입니다.
+**Browser·Preview 탭, 스페이스/워크트리별 Browser, 한국어 글꼴과 개인 화면 배치**를 포함합니다.
+원본은 [herdrdev/herdr-app](https://github.com/herdrdev/herdr-app)입니다.
 
-## 설치
+## 다른 맥북에 설치
 
-Apple Silicon · macOS 14 이상 · Git/Python 3 · 설치된 공식 Herdr/core가 필요합니다.
-호환 코어는 generation 1, 0.1.11 이상입니다. 설치기는 코어를 교체하거나 재시작하지 않습니다.
-저장소가 공개돼 있어 GitHub 계정이나 로그인 없이 내려받을 수 있습니다.
+Apple Silicon(M 시리즈) · macOS 14 이상에서 사용합니다.
+먼저 기본 Herdr 앱과 호환 core를 설치하세요. core는 generation 1, 0.1.11 이상이 필요합니다.
+Herdr Preview가 실행 중이면 창만 닫은 뒤 아래 명령어를 터미널에 붙여넣으세요.
 
-```sh
+```bash
 git clone --depth 1 https://github.com/kimdaehee90/herdr-preview-public.git "$HOME/.local/share/herdr-preview-public" && bash "$HOME/.local/share/herdr-preview-public/install-personal.sh" && open "$HOME/Applications/Herdr Preview.app"
 ```
 
-이미 내려받았다면 해당 폴더에서 `git pull --ff-only` 후 `bash install-personal.sh`를 실행합니다.
-복원 전에는 Herdr Preview 창만 닫으세요. 실행 중인 개인 GUI가 있으면 설정 변경을 중단합니다.
-기본 Herdr 앱의 설치 방법은 [원본 저장소 안내](https://github.com/herdrdev/herdr-app#install)를 참고하세요.
+GitHub 로그인 없이 설치할 수 있습니다. 설치 후 오른쪽 위의 **Preview** 또는 **Browser**를 누르세요.
+기본 앱 설치 방법은 [원본 저장소 안내](https://github.com/herdrdev/herdr-app#install)를 참고하세요.
+
+## 이미 설치했다면 업데이트
+
+Herdr Preview 창을 닫고 실행하세요. 코어와 AI 작업은 계속 실행해 둘 수 있습니다.
+
+```bash
+git -C "$HOME/.local/share/herdr-preview-public" pull --ff-only && bash "$HOME/.local/share/herdr-preview-public/install-personal.sh" && open "$HOME/Applications/Herdr Preview.app"
+```
+
+설치기는 이전 앱과 설정을 백업하며, 기존 Browser 탭 목록과 이 맥의 로그인 프로필을 유지합니다.
+코어를 교체하거나 재시작하지 않습니다.
 
 ## 포함한 기능
 
-- 터미널 옆에서 HTML·이미지·PDF·개발 서버 결과물을 여는 Preview, 여러 탭 추가·전환·닫기.
-- 스페이스·워크트리별 전용 Browser와 여러 웹 탭, 로그인 공유, 클릭·한글 입력·사진 업로드, 폭 맞춤·줌·모바일 사이트 모드.
-- 각 AI가 `space`·`tab`을 지정해 담당 편집기를 동시에 조작. 탭 URL·선택·보기 설정 복원과 비활성 탭의 지연 로딩.
-- 맞춤·줌·PC/모바일 전환을 앞뒤 이동 버튼과 한 줄에 배치한 간결한 도구 모음.
-- 브라우저에서 터미널로 돌아올 때 키보드 포커스 복원.
-- 비밀번호·인증번호·카드 입력란 보호와 입력 반영 확인.
-- 상태 보고가 없는 알려진 AI 프로세스도 표시하는 개인 Agents 모듈.
-- D2Coding·Pretendard 글꼴, 단축키, 개인 화면 배치, 업데이트 시 사용자 수정 보존.
+- **Preview:** HTML·이미지·PDF·개발 서버 결과물. `+`로 탭 추가, 클릭으로 전환, `×`로 닫기.
+- **Browser:** 웹사이트 탭, 로그인 유지, 클릭·한글 입력·사진 업로드.
+- **작업 공간별 Browser:** 스페이스나 워크트리를 바꾸면 해당 작업의 Browser와 탭들이 표시됩니다.
+- **AI별 담당 탭:** 각 AI가 자신의 스페이스·탭을 지정해 다른 편집기에 동시에 입력할 수 있습니다.
+- **간결한 도구 모음:** 왼쪽 제목·앞뒤 이동, 가운데 맞춤·줌, 오른쪽 PC/모바일·블로그. 주소창은 그 아래 한 줄입니다.
+- D2Coding·Pretendard 글꼴, 한국어 입력, 키보드 포커스 복원, Codex 하단 상태줄 색상.
+- 상태 보고가 없는 알려진 AI도 표시하는 Agents 모듈과 사용자 수정 보존.
 
-새 로컬 macOS GUI 패인은 `NO_COLOR` 변수를 완전히 제거합니다. 빈 문자열로만 바꾸면 Codex 하단 상태줄의 색상이 여전히 꺼지는 문제까지 처리합니다.
-이미 실행 중인 프로그램의 환경은 유지하므로, 기존 프로그램은 작업을 마친 뒤 새 GUI 패인에서 다시 열어야 색상이 적용됩니다.
+Browser 탭은 같은 맥의 로그인 프로필을 공유합니다. Preview 탭과 파일 서버는 작업 공간별로 관리합니다.
+탭을 바꾸는 동안 페이지·작성 내용·스크롤이 유지됩니다. 앱 재실행 시에는 탭 주소·선택·보기 설정을 복원하므로, 작성 중인 글은 사이트에서 임시저장한 뒤 앱을 닫으세요.
+열린 탭은 패널당 최대 32개이며, 복원된 비활성 탭은 선택할 때 불러옵니다.
 
-설치기는 맥마다 기기 전용 코드 서명 인증서를 만들고 이후 업데이트에도 재사용합니다. 이전 버전과 새 버전의 임시 서명이 충돌해 폴더 접근을 반복 요청하는 문제를 방지합니다. 서명 키는 `~/Library/Application Support/Herdr Preview/Signing`에만 두며 GitHub로 전송하지 않습니다. 최초 전환 시 macOS의 폴더 접근 허용이 한 번 필요할 수 있습니다. 시스템 신뢰 설정과 전체 디스크 접근 권한은 변경하지 않습니다.
+## 두 작업을 동시에 맡기기
 
-웹사이트 로그인은 설치한 맥북에서 직접 진행합니다. 공개 패키지에 쿠키·계정 비밀값·게시글 초안·대화·코어 세션은 포함하지 않습니다.
-프로그램은 `~/Applications/Herdr Preview.app`, 설정은 `~/.config/herdr-preview`, 명령은 `~/.local/bin/herdr-preview`입니다.
-기존 개인 앱과 설정은 `~/Library/Application Support/Herdr Personal/backups/`에 보관하며 설치 오류 시 복구합니다.
-앱 아카이브와 설정 파일의 체크섬은 `packages/personal-release.json`에 있습니다.
+AI 패인을 두 개 열고 각각 별도 대화로 지시하세요. 예를 들면:
 
-## 공개 배포와 소스
+> A 블로그용 Browser 탭을 만들고 이 탭만 사용해서 글을 작성해줘. 결과 파일은 blog-a 폴더에 저장해줘.
 
-개인 Git 이력 없이 시작한 소스 사본을 배포합니다. Rust 컴파일 경로를 일반화하고 심볼을 제거한 후 네이티브 검사를 실행합니다.
-압축 파일의 UID/GID·사용자/그룹명·시각 메타데이터를 정규화합니다.
-개인 설정 중 글꼴·단축키·화면 구조에 필요한 파일만 선별하며 배포 전 개인정보·인증키 패턴 검사를 통과해야 합니다.
-자세한 빌드·검증 방법은 [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md)를 참고하세요.
+> B 블로그용 Browser 탭을 만들고 이 탭만 사용해서 다른 글을 작성해줘. 결과 파일은 blog-b 폴더에 저장해줘.
 
-공개 저장소의 GitHub 소유자 이름과 기존 오픈소스 저작자 표시는 공개 정보입니다.
-원본과 변경 소스는 Apache-2.0, 포함한 글꼴은 각각의 SIL Open Font License를 유지합니다.
+Git 저장소에서는 독립 워크트리와 스페이스를 만들어 작업 파일도 분리할 수 있습니다.
+AI용 상세 안내는 설치 폴더의 `AGENTS.md`와 `herdr-preview --skill`에 있습니다.
+자동 조작은 담당 `space`·`tab`을 명시하며, 없는 대상을 지정하면 다른 탭으로 대체하지 않고 실패합니다.
+
+## 폴더 접근 허용과 로그인
+
+첫 설치 또는 기존 임시 서명에서 전환할 때 macOS가 폴더 접근 허용을 한 번 요청할 수 있습니다.
+설치기는 맥마다 전용 코드 서명 인증서를 만들고 이후 업데이트에도 같은 인증서를 재사용합니다.
+이전 앱과 새 앱의 서명이 달라 폴더 접근을 반복 요청하던 문제를 방지합니다.
+시스템 신뢰 목록이나 전체 디스크 접근 권한은 변경하지 않습니다.
+
+서명 키는 `~/Library/Application Support/Herdr Preview/Signing`에서 이 맥의 업데이트에만 재사용합니다.
+웹사이트 로그인은 설치한 맥에서 직접 진행하세요. 발행·저장은 실제 사이트에서 확인해야 합니다.
+
+## 설치 위치와 개인정보
+
+| 항목 | 위치 |
+|---|---|
+| 앱 | `~/Applications/Herdr Preview.app` |
+| 설정 | `~/.config/herdr-preview` |
+| 명령 | `~/.local/bin/herdr-preview` |
+| 복원 전 백업 | `~/Library/Application Support/Herdr Personal/backups/` |
+
+공개 패키지에는 로그인 쿠키·인증키·게시글 초안·대화·코어 세션·기기 전용 서명 키를 포함하지 않습니다.
+선별한 글꼴·단축키·화면 설정만 배포하며, 빌드 경로와 압축 파일 메타데이터를 일반화하고 개인정보 검사를 진행합니다.
+자세한 내용은 [공개 빌드 안내](PUBLIC_RELEASE.md)를 참고하세요.
+
+기존 오픈소스 저작자 표시는 유지합니다. 원본과 변경 소스는 Apache-2.0, 글꼴은 SIL Open Font License입니다.
 [LICENSE](LICENSE) · [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES) · [글꼴 라이선스](personal-profile/fonts/)
