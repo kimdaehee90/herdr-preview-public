@@ -344,8 +344,8 @@ struct Watched {
 }
 
 pub struct AppWindow {
-    previews: HashMap<String, Entity<crate::preview::Preview>>,
-    browser: Option<Entity<crate::preview::Preview>>,
+    previews: HashMap<String, Entity<crate::preview::PagePanel>>,
+    browsers: HashMap<String, Entity<crate::preview::PagePanel>>,
     core: Arc<Core>,
     runtime: Option<Rc<ShellRuntime>>,
     chrome: Node,
@@ -452,18 +452,22 @@ pub struct AppWindow {
 }
 
 impl AppWindow {
-    fn ensure_browser(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::Preview> {
-        let view = self.browser.get_or_insert_with(|| cx.new(|cx| crate::preview::Preview::new_browser(window, cx))).clone();
-        view.update(cx, |browser, cx| browser.context(&home(), window, cx));
-        view
+    fn ensure_browser(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::PagePanel> {
+        let space=self.model.active.clone().unwrap_or_default();
+        self.ensure_browser_for(&space,window,cx)
     }
-
-    fn ensure_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::Preview> {
-        let space = self.model.active.clone().unwrap_or_default();
-        let cwd = if space.is_empty() { mods::home().to_string_lossy().into_owned() } else { self.folder_for(&space) };
-        let view = self.previews.entry(space.clone()).or_insert_with(|| cx.new(|cx| crate::preview::Preview::new(&space, window, cx))).clone();
-        view.update(cx, |preview, cx| preview.context(&cwd, window, cx));
-        view
+    fn ensure_browser_for(&mut self, space: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::PagePanel> {
+        let view=self.browsers.entry(space.to_owned()).or_insert_with(||cx.new(|cx|crate::preview::PagePanel::new_browser(space,window,cx))).clone();
+        view.update(cx,|p,cx|p.context(&home(),window,cx)); view
+    }
+    fn ensure_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::PagePanel> {
+        let space=self.model.active.clone().unwrap_or_default();
+        self.ensure_preview_for(&space,window,cx)
+    }
+    fn ensure_preview_for(&mut self, space: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::preview::PagePanel> {
+        let cwd=if space.is_empty() {home()} else {self.folder_for(space)};
+        let view=self.previews.entry(space.to_owned()).or_insert_with(||cx.new(|cx|crate::preview::PagePanel::new(space,window,cx))).clone();
+        view.update(cx,|p,cx|p.context(&cwd,window,cx)); view
     }
 
     pub fn new(core: Arc<Core>, requests: async_channel::Receiver<Request>, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -472,7 +476,7 @@ impl AppWindow {
         let seen = std::fs::read_to_string(file("seen.json")).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
         let mut w = AppWindow {
             previews: HashMap::new(),
-            browser: None,
+            browsers: HashMap::new(),
             core,
             runtime,
             chrome: default_layout("main"),
@@ -2749,6 +2753,7 @@ impl AppWindow {
                 }
                 let addrs = self.model.remove_space(&id);
                 self.previews.remove(&id);
+                self.browsers.remove(&id);
                 self.kill(&addrs, cx);
             }
             "space.rename" => {
@@ -3134,6 +3139,31 @@ impl AppWindow {
                     view.update(cx, |p, cx| p.reload(cx));
                 }
             }
+            "browser.tab.new" | "browser.tab.select" | "browser.tab.close" |
+            "preview.tab.new" | "preview.tab.select" | "preview.tab.close" => {
+                for key in ["space","id","url","target"] {
+                    if a.get(key).is_some_and(|v| !v.is_string()) {return self.fail(format!("{key} must be a string"));}
+                }
+                let browser = name.starts_with("browser.");
+                let space=Self::arg(a,"space").map(str::to_owned).or_else(||self.model.active.clone()).unwrap_or_default();
+                if !space.is_empty() && self.model.space(&space).is_none() {return self.fail("Space not found");}
+                let view=if browser {self.ensure_browser_for(&space,window,cx)} else {self.ensure_preview_for(&space,window,cx)};
+                let result = view.update(cx, |panel,cx| {
+                    if name.ends_with(".new") { panel.new_tab(Self::arg(a,if browser {"url"} else {"target"}),window,cx) }
+                    else if name.ends_with(".select") { panel.select_tab(Self::arg(a,"id").unwrap_or_default(),window,cx) }
+                    else { panel.close_tab(Self::arg(a,"id"),window,cx) }
+                });
+                match result { Ok(mut value) => {value["space"]=json!(space);self.reply=Some(value);}, Err(error) => return self.fail(error) }
+                if !Self::arg(a,"space").is_some_and(|id|self.model.active.as_deref()!=Some(id)) {
+                let panel = if browser {"browser"} else {"preview"};
+                let other = if browser {"preview"} else {"browser"};
+                mods::set_shared(format!("{panel}.open_request"),json!({"space":self.model.active.as_deref().unwrap_or("")}));
+                mods::set_shared(format!("{other}.open_request"),Value::Null);
+                if let Some(panel) = self.chrome.find_mut("panel") { panel.hidden=false; }
+                if let Some(Node {kind:Kind::Stack {active,..},..})=self.chrome.find_mut("panel-body") { *active=Some(panel.into()); }
+                cx.activate(true); window.activate_window();
+                }
+            }
             "browser.open" => {
                 let view = self.ensure_browser(window, cx);
                 if let Some(url) = Self::arg(a, "url") {
@@ -3148,13 +3178,13 @@ impl AppWindow {
             "browser.view" | "preview.view" => {
                 let view = if name == "browser.view" { self.ensure_browser(window, cx) } else { self.ensure_preview(window, cx) };
                 if let Err(error) = view.update(cx, |page,cx|page.configure_view(a,window,cx)) { return self.fail(error); }
-                self.reply = Some(view.read(cx).status());
+                self.reply = Some(view.read(cx).status(cx));
             }
             "browser.reload" | "browser.back" | "browser.forward" => {
                 let view = self.ensure_browser(window, cx);
                 view.update(cx, |browser, cx| {
                     if name == "browser.reload" { browser.reload(cx); }
-                    else { browser.navigate_history(name == "browser.forward"); }
+                    else { browser.navigate_history(name == "browser.forward", cx); }
                 });
             }
             "browser.read" | "browser.click" | "browser.fill" | "browser.upload" | "browser.scroll" | "browser.screenshot" => {
@@ -3573,8 +3603,15 @@ impl AppWindow {
                             let _ = reply.send(json!({"error":format!("{name} needs {arg}")})); return;
                         }
                     }
-                    if let Some(view) = &self.browser { view.update(cx, |page,cx| page.automate(name, &args, reply, cx)); }
-                    else { let _ = reply.send(json!({"error":"Open the Browser panel first: browser.open"})); }
+                    let explicit_space=args.get("space");
+                    let view=if let Some(space)=explicit_space {
+                        let Some(space)=space.as_str().filter(|id|self.model.space(id).is_some()) else {let _=reply.send(json!({"error":"Space not found"}));return;};
+                        Some(self.ensure_browser_for(space,window,cx))
+                    } else if let Some(tab)=args.get("tab").and_then(Value::as_str) {
+                        self.browsers.values().find(|p|p.read(cx).has_tab(tab)).cloned()
+                    } else {self.browsers.get(self.model.active.as_deref().unwrap_or("")).cloned()};
+                    if let Some(view)=view { view.update(cx,|page,cx|page.automate(name,&args,reply,window,cx)); }
+                    else {let _=reply.send(json!({"error":"Browser page/space not found. Open Browser or specify space and tab."}));}
                     return;
                 }
                 let _ = reply.send(self.control(cmd, window, cx));
@@ -3595,19 +3632,19 @@ impl AppWindow {
         #[cfg(all(debug_assertions, target_os = "macos"))]
         if let Some(script) = cmd.get("_browser_test").and_then(Value::as_str) {
             if std::env::var("HERDR_PREVIEW_TEST_CONTROL").as_deref() != Ok("1") { return json!({"error":"test control disabled"}); }
-            return match self.browser.as_ref().ok_or_else(|| "No browser".to_string()).and_then(|p| p.read(cx).test_probe(script)) {
+            return match self.browsers.get(self.model.active.as_deref().unwrap_or("")).ok_or_else(|| "No browser".to_string()).and_then(|p| p.read(cx).test_probe(script, cx)) {
                 Ok(()) => json!({"queued":true}), Err(error) => json!({"error":error}),
             };
         }
         #[cfg(all(debug_assertions, target_os = "macos"))]
         if let Some(action) = cmd.get("_browser_focus_test").and_then(Value::as_str) {
             if std::env::var("HERDR_PREVIEW_TEST_CONTROL").as_deref() != Ok("1") { return json!({"error":"test control disabled"}); }
-            return self.browser.as_ref().map(|p| p.read(cx).test_native_focus(action)).unwrap_or_else(|| json!({"error":"No browser"}));
+            return self.browsers.get(self.model.active.as_deref().unwrap_or("")).map(|p| p.read(cx).test_native_focus(action, cx)).unwrap_or_else(|| json!({"error":"No browser"}));
         }
         #[cfg(all(debug_assertions, target_os = "macos"))]
         if let Some(script) = cmd.get("_preview_test").and_then(Value::as_str) {
             if std::env::var("HERDR_PREVIEW_TEST_CONTROL").as_deref() != Ok("1") { return json!({"error":"test control disabled"}); }
-            return match self.previews.get(self.model.active.as_deref().unwrap_or("")).ok_or_else(|| "No preview".to_string()).and_then(|p| p.read(cx).test_probe(script)) {
+            return match self.previews.get(self.model.active.as_deref().unwrap_or("")).ok_or_else(|| "No preview".to_string()).and_then(|p| p.read(cx).test_probe(script, cx)) {
                 Ok(()) => json!({"queued":true}), Err(error) => json!({"error":error}),
             };
         }
@@ -3651,8 +3688,8 @@ impl AppWindow {
                 "layout": self.layout_name,
                 "agent": self.shown_agent(),
                 "floats": self.float_status(),
-                "preview": self.previews.get(self.model.active.as_deref().unwrap_or("")).map(|p| p.read(cx).status()),
-                "browser": self.browser.as_ref().map(|p| p.read(cx).status()),
+                "preview": self.previews.get(self.model.active.as_deref().unwrap_or("")).map(|p| p.read(cx).status(cx)),
+                "browser": self.browsers.get(self.model.active.as_deref().unwrap_or("")).map(|p| p.read(cx).status(cx)),
                 "overlays": self.overlays.iter().map(|o| match &o.layout {
                     Some(_) => Some("layout".to_owned()),
                     None => self.copies.get(&o.slot).map(|c| c.inst.name.clone()),
@@ -3981,7 +4018,7 @@ impl AppWindow {
                 self.previews.get(space).map(|view| div().size_full().child(view.clone()).into_any_element())
                     .unwrap_or_else(|| div().into_any_element())
             },
-            Content::Browser { .. } => self.browser.as_ref().map(|view| div().size_full().child(view.clone()).into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Content::Browser { .. } => self.browsers.get(self.model.active.as_deref().unwrap_or("")).map(|view| div().size_full().child(view.clone()).into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Content::Agent { .. } => match self.shown_agent() {
                 Some(addr) => match self.agent_view(&n.id, &addr) {
                     Some(t) => div().size_full().child(shown_terminal(&t.view, cx)).into_any_element(),
@@ -4690,10 +4727,10 @@ impl Render for AppWindow {
         // dialogs or drag layers are present, preserving the page's DOM.
         let allow = preview_visible && self.overlays.is_empty() && self.pane_drag.is_none();
         for (space, preview) in &self.previews {
-            preview.update(cx, |p, _| p.allow(allow && space == active_space));
+            preview.update(cx, |p, cx| p.allow(allow && space == active_space, cx));
         }
-        if let Some(browser) = &self.browser {
-            browser.update(cx, |p, _| p.allow(browser_visible && self.overlays.is_empty() && self.pane_drag.is_none()));
+        for (space,browser) in &self.browsers {
+            browser.update(cx, |p,cx|p.allow(browser_visible && space==active_space && self.overlays.is_empty() && self.pane_drag.is_none(),cx));
         }
         let tree = self.render_node(&self.chrome, &focused, None, cx);
         let tree = self.window_frame(tree, window, cx);

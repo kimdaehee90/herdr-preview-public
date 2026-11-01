@@ -147,6 +147,7 @@ impl Preview {
         }
         action.insert("op".into(), json!(op));
         let generation = self.generation;
+        let epoch = self.automation_epoch;
         let guarded = matches!(op, "read" | "fill" | "upload");
         cx.spawn(async move |this, cx| {
             let mut action = Value::Object(action);
@@ -163,7 +164,7 @@ impl Preview {
                     let _ = timeout_sender.try_send(json!({"error":"WebKit did not answer; inspect the page before retrying."}));
                 }).detach();
                 let started = this.update(cx, |page, _| -> Result<(), String> {
-                    if page.generation != generation || page.loading { return Err("Browser page changed; read it again before acting.".into()); }
+                    if page.generation != generation || page.automation_epoch != epoch || page.loading { return Err("Browser page or tab changed; read it again before acting.".into()); }
                     if let Some(error) = &page.error { return Err(error.clone()); }
                     let browser = page.browser.borrow();
                     let view = browser.view.as_ref().ok_or("Open Browser first.")?;
@@ -180,7 +181,7 @@ impl Preview {
                 }
                 let value = receiver.recv().await.unwrap_or_else(|_| json!({"error":"Browser callback closed"}));
                 if guarded {
-                    let valid = this.update(cx, |page, _| page.generation == generation && !page.loading && page.error.is_none()).unwrap_or(false);
+                    let valid = this.update(cx, |page, _| page.generation == generation && page.automation_epoch == epoch && !page.loading && page.error.is_none()).unwrap_or(false);
                     if !valid { let _ = reply.send(json!({"error":"Browser navigated while verifying the result.","accepted":token.is_some(),"applied":false})); return; }
                 }
                 if let Some(pending) = value["pending"].as_str() {
@@ -193,7 +194,7 @@ impl Preview {
             }
             if let Some(token) = token {
                 let _ = this.update(cx, |page, _| {
-                    if page.generation == generation {
+                    if page.generation == generation && page.automation_epoch == epoch {
                         if let Some(view) = &page.browser.borrow().view {
                             if let Ok(url) = view.url() { let _ = view.evaluate_script(&browser_script(&json!({"op":"cancel","token":token}), &url)); }
                         }

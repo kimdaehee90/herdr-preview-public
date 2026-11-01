@@ -115,6 +115,29 @@ try:
     assert probe("document.getElementById('count').textContent") == '2'
     passed('Files/Preview switch preserves page state')
 
+    first_tab=call({'status':True})['preview']['active_tab']
+    do('preview.view',zoom=.75)
+    image_tab=do('preview.tab.new',target=str(artifacts/'icon.svg'))['tab'];visible(True)
+    wait(lambda:probe('document.documentElement.tagName.toLowerCase()')=='svg','Image tab did not load')
+    image_url=call({'status':True})['preview']['url']
+    do('preview.tab.select',id=first_tab);visible(True)
+    assert probe("document.getElementById('count').textContent")=='2'
+    assert call({'status':True})['preview']['page_zoom']==.75
+    assert sum(t['visible'] for t in call({'status':True})['preview']['tabs'])==1
+    passed('Preview artifact tabs retain independent live documents and zoom when switching')
+    empty_tab=do('preview.tab.new')['tab']
+    wait(lambda:not any(t['visible'] for t in call({'status':True})['preview']['tabs']),'Old Preview remained visible behind a fresh tab')
+    do('preview.tab.close',id=empty_tab)
+    do('preview.tab.close',id=image_tab)
+    def image_server_closed():
+        try:
+            with urllib.request.urlopen(image_url,timeout=.3) as response:return response.status!=200
+        except OSError:return True
+    wait(image_server_closed,'Closed artifact tab kept its folder server alive')
+    assert probe("document.getElementById('count').textContent")=='2'
+    passed('Fresh Preview tabs hide old pages; closing a tab releases its native view and file server')
+    do('preview.view',fit=True)
+
     do('app.settings', section='look'); visible(False)
     do('overlay.close'); visible(True)
     assert probe("document.getElementById('name').value") == '대한민국'

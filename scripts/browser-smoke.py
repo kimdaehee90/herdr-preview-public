@@ -28,7 +28,7 @@ if not (home/'shared.json').exists():
 
 PAGE='''<!doctype html><html lang="ko"><meta charset="utf-8"><title>Browser 검증</title>
 <style>body{font:16px -apple-system;margin:30px;color:#17442b;background:#f4f7f4}label,input,textarea{display:block;margin:8px 0}input,textarea,[contenteditable]{width:90%;padding:10px;border:1px solid #adc3af;border-radius:6px}[contenteditable]{min-height:70px;background:white}button{padding:10px 18px;background:#205e3b;color:white;border:0;border-radius:6px}iframe{width:95%;height:120px;border:1px solid #adc3af}#result{padding:12px;background:#e1eee3}</style>
-<h1>브라우저 입력 테스트</h1><label>제목<input id="title" aria-label="제목"></label>
+<h1>브라우저 입력 테스트</h1><a href="/tab-two" target="_blank">새 탭 링크</a><label>제목<input id="title" aria-label="제목"></label>
 <div id="body" role="textbox" aria-label="본문" contenteditable="true"></div>
 <p id="lazy-title" onmousedown="document.getElementById('lazy-editor').hidden=false">편집 활성화</p>
 <div id="lazy-editor" aria-label="지연 편집기" contenteditable="plaintext-only" hidden></div>
@@ -77,6 +77,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
    data='<html><body>cross-origin private frame</body></html>'
   elif self.path.startswith('/bridge'):
    data='<html><body><div contenteditable="true" aria-label="가상 입력 프레임" style="min-width:10px;min-height:10px" onpaste="event.preventDefault();parent.document.getElementById(\'bridge-result\').textContent=event.clipboardData.getData(\'text/plain\')"></div></body></html>'
+  elif self.path.startswith('/tab-two'):
+   data=PAGE.replace('CROSS_URL',cross_url).replace('<title>Browser 검증</title>','<title>두 번째 Browser 탭</title>')
   elif self.path.startswith('/hang'):
    time.sleep(18);return
   elif self.path.startswith('/wide-frame'):
@@ -313,6 +315,63 @@ try:
  assert do('browser.fill',ref=old_ref,text='MUST-NOT-EDIT-OLD-PAGE').get('kind')=='navigation_failed'
  do('browser.open',url=url);read_ready()
  passed('Timed-out navigation blocks stale reads and writes until successful reload')
+ # Real independent pages, shared profile, explicit agent ownership and restoration.
+ owner_a=do('space.new',name='Browser tabs owner A',folder=str(root))['space']
+ do('browser.open',url=url);data=read_ready();tab_a=status()['browser']['active_tab']
+ assert do('browser.fill',ref=ref(data,'제목'),text='tab-A unsaved')['ok']
+ do('browser.view',zoom=.75)
+ stale_a=ref(page(),'제목')
+ tab_b=do('browser.tab.new',url=url+'tab-two')['tab'];data=read_ready()
+ assert data['title']=='두 번째 Browser 탭'
+ assert any('qa-cookie=survived' in f.get('text','') for f in data['frames'])
+ assert 'error' in do('browser.fill',space=owner_a,tab=tab_b,ref=stale_a,text='WRONG-TAB')
+ assert 'error' in do('browser.fill',space=owner_a,tab='missing-page',ref=stale_a,text='WRONG-TAB')
+ passed('Browser tabs have separate documents, shared cookies and reject foreign or unknown refs/ids')
+ data_a=do('browser.read',space=owner_a,tab=tab_a)
+ assert next(e for e in data_a['elements'] if e['label']=='제목')['value']=='tab-A unsaved'
+ assert do('browser.fill',space=owner_a,tab=tab_a,ref=ref(data_a,'제목'),text='agent-A edit')['ok']
+ data_b=page();assert do('browser.fill',space=owner_a,tab=tab_b,ref=ref(data_b,'제목'),text='agent-B edit')['ok']
+ assert status()['browser']['active_tab']==tab_b
+ do('browser.tab.select',id=tab_a);data=read_ready()
+ assert next(e for e in data['elements'] if e['label']=='제목')['value']=='agent-A edit'
+ assert status()['browser']['page_zoom']==.75
+ assert sum(t['visible'] for t in status()['browser']['tabs'])==1
+ passed('Agents can edit their own background tab without changing selection; forms and view choices survive switching')
+ # A delayed editor verification must not report success after a tab switch.
+ result={};pending_ref=ref(page(),'지연 모델')
+ pending=threading.Thread(target=lambda:result.update(do('browser.fill',ref=pending_ref,text='pending-tab-edit')))
+ pending.start();time.sleep(.08);do('browser.tab.select',id=tab_b);pending.join(8)
+ assert not pending.is_alive() and result.get('error') and not result.get('ok'),result
+ passed('Switching a tab cancels in-flight text verification instead of reporting success on another page')
+ owner_b=do('space.new',name='Browser tabs owner B',folder=str(root))['space']
+ do('browser.open',url=url+'tab-two');data=read_ready();work_b=status()['browser']['active_tab']
+ assert do('browser.fill',space=owner_b,tab=work_b,ref=ref(data,'제목'),text='worktree-B')['ok']
+ data_a=do('browser.read',space=owner_a,tab=tab_a)
+ assert do('browser.fill',space=owner_a,tab=tab_a,ref=ref(data_a,'제목'),text='worktree-A')['ok']
+ assert next(e for e in page()['elements'] if e['label']=='제목')['value']=='worktree-B'
+ do('space.select',id=owner_a);do('browser.open');data=read_ready()
+ assert status()['browser']['active_tab']==tab_b and len(status()['browser']['tabs'])==2
+ do('browser.tab.select',id=tab_a);data=read_ready()
+ assert next(e for e in data['elements'] if e['label']=='제목')['value']=='worktree-A'
+ passed('Each space/worktree owns its Browser and agents can explicitly operate another space without switching the visible one')
+ do('browser.scroll',y=-10000);data=page();before=len(status()['browser']['tabs'])
+ clicked=do('browser.click',ref=ref(data,'새 탭 링크'))
+ wait(lambda:len(status()['browser']['tabs'])==before+1,'Popup did not open a new tab')
+ read_ready();popup=status()['browser']['active_tab']
+ assert popup not in [tab_a,tab_b]
+ do('browser.tab.close',id=popup);do('browser.tab.select',id=tab_b)
+ assert 'error' in do('browser.tab.new',url='file:///etc/passwd')
+ assert len(status()['browser']['tabs'])==2
+ passed('Popup links create page tabs and invalid new-tab targets do not create or replace pages')
+ do('app.quit');process.wait(timeout=10);start();do('browser.open');read_ready()
+ restored=status()['browser'];assert restored['active_tab']==tab_b and [t['id'] for t in restored['tabs']]==[tab_a,tab_b]
+ assert sum(t['materialized'] for t in restored['tabs'])==1
+ do('browser.tab.select',id=tab_a);read_ready();assert status()['browser']['page_zoom']==.75
+ passed('Browser tab order, selection and per-tab view restore, with inactive pages loaded lazily')
+ do('browser.tab.close',id=tab_b);do('browser.tab.close',id=tab_a)
+ assert len(status()['browser']['tabs'])==1 and status()['browser']['active_tab'] not in [tab_a,tab_b]
+ passed('Closing the last Browser tab creates a fresh page instead of resurrecting a closed draft')
+ do('space.close',id=owner_b,confirmed=True);do('space.close',id=owner_a,confirmed=True)
  assert not status().get('errors'),status().get('errors')
  report={'all_passed':True,'count':len(checks),'checks':checks,'note':'Tests only fill and click local fixtures. Naver login/editor/publishing are not exercised.'}
  (home.parent/'smoke-results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))

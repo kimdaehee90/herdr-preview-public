@@ -17,6 +17,7 @@ enum Event {
     Loaded(String),
     Changed,
     Popup(String),
+    Title(String),
     Resized,
     FitMeasured(u64, f64, f64, u8),
 }
@@ -108,6 +109,10 @@ pub struct Preview {
     dirty: bool,
     allowed: bool,
     pub(super) generation: u64,
+    pub(super) automation_epoch: u64,
+    tabbed: bool,
+    popup: Option<String>,
+    title: String,
     restored: bool,
     page_zoom: f64,
     fit_width: bool,
@@ -121,7 +126,7 @@ fn color(name: &str) -> Hsla {
     settings::color(name)
 }
 
-fn network_url(value: &str) -> bool {
+pub(super) fn network_url(value: &str) -> bool {
     url::Url::parse(value).is_ok_and(|u| {
         matches!(u.scheme(), "http" | "https")
             && u.host_str().is_some()
@@ -130,7 +135,7 @@ fn network_url(value: &str) -> bool {
     })
 }
 
-fn target(value: &str, cwd: &str) -> Result<String, String> {
+pub(super) fn target(value: &str, cwd: &str) -> Result<String, String> {
     let value = value.trim();
     let value = if value.len() >= 2
         && ((value.starts_with('\'') && value.ends_with('\''))
@@ -204,8 +209,19 @@ impl Preview {
         Self::new_with_mode(space, false, window, cx)
     }
 
-    pub fn new_browser(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Self::new_with_mode("browser", true, window, cx)
+    pub fn new_browser_tab(id: &str, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut page = Self::new_with_mode(id, true, window, cx);
+        page.tabbed = true;
+        page
+    }
+
+    pub fn take_popup(&mut self) -> Option<String> { self.popup.take() }
+
+    pub fn invalidate_automation(&mut self) {
+        self.automation_epoch += 1;
+        if let Some(view) = &self.browser.borrow().view {
+            let _ = view.evaluate_script("window.__herdrBrowserRefs?.clear(); window.__herdrBrowserPending?.clear();");
+        }
     }
 
     fn new_with_mode(
@@ -264,8 +280,16 @@ impl Preview {
                                 }
                             }
                             Event::Popup(url) => {
-                                let cwd = this.cwd.clone();
-                                let _ = this.open(&url, &cwd, window, cx);
+                                if this.tabbed {
+                                    this.popup = Some(url);
+                                } else {
+                                    let cwd = this.cwd.clone();
+                                    let _ = this.open(&url, &cwd, window, cx);
+                                }
+                            }
+                            Event::Title(title) => {
+                                this.title = title.chars().take(200).collect();
+                                this.save_view();
                             }
                             Event::Resized => this.schedule_fit(cx),
                             Event::FitMeasured(generation, available, content, pass) => {
@@ -318,6 +342,10 @@ impl Preview {
             dirty: false,
             allowed: false,
             generation: 0,
+            automation_epoch: 0,
+            tabbed: false,
+            popup: None,
+            title: String::new(),
             restored: false,
             page_zoom: 1.0,
             fit_width: true,
@@ -326,6 +354,14 @@ impl Preview {
             _subscription: subscription,
             _events: events,
         }
+    }
+
+    pub fn context_initial(&mut self, cwd: &str, target: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(target) = target.filter(|_| !self.restored) {
+            self.restored = true;
+            self.cwd = cwd.into();
+            let _ = self.open(target, cwd, window, cx);
+        } else { self.context(cwd, window, cx); }
     }
 
     pub fn context(&mut self, cwd: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -337,6 +373,7 @@ impl Preview {
                 .and_then(|s| serde_json::from_str(&s).ok())
                 .unwrap_or(json!({}));
             let view = &saved["_view"][&self.space];
+            self.title = view["title"].as_str().unwrap_or_default().chars().take(200).collect();
             self.page_zoom = view["zoom"]
                 .as_f64()
                 .filter(|z| z.is_finite())
@@ -374,7 +411,7 @@ impl Preview {
             saved["_view"] = json!({});
         }
         saved["_view"][&self.space] =
-            json!({"zoom":self.page_zoom,"fit":self.fit_width,"mobile":self.mobile});
+            json!({"zoom":self.page_zoom,"fit":self.fit_width,"mobile":self.mobile,"title":self.title});
         let _ = crate::persist::write_atomic(&path, serde_json::to_string_pretty(&saved).unwrap());
     }
 
@@ -538,6 +575,7 @@ impl Preview {
         }
         let loads = self.events.clone();
         let popups = self.events.clone();
+        let titles = self.events.clone();
         let mut builder = wry::WebViewBuilder::new()
             .with_url("about:blank")
             .with_visible(false)
@@ -545,6 +583,7 @@ impl Preview {
             .with_incognito(!self.is_browser)
             .with_navigation_handler(|url| url == "about:blank" || network_url(&url))
             .with_download_started_handler(|_, _| false)
+            .with_document_title_changed_handler(move |title| { let _ = titles.try_send(Event::Title(title)); })
             .with_new_window_req_handler(move |url, _| {
                 if network_url(&url) {
                     let _ = popups.try_send(Event::Popup(url));
@@ -764,7 +803,7 @@ impl Preview {
     pub fn status(&self) -> Value {
         json!({"supported": true, "target": self.target, "url": self.url, "loading": self.loading,
             "error": self.error, "auto_reload": self.auto, "visible": self.browser.borrow().shown,
-            "persistent": self.is_browser,"page_zoom":self.page_zoom,"fit_width":self.fit_width,"mobile":self.mobile})
+            "persistent": self.is_browser,"page_zoom":self.page_zoom,"fit_width":self.fit_width,"mobile":self.mobile,"title":self.title})
     }
 
     fn step_zoom(&mut self, increase: bool, window: &mut Window, cx: &mut Context<Self>) {

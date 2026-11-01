@@ -96,6 +96,17 @@ Preview has `preview.view` for zoom/fit. The panels expose these controls below
 the address bar, and the center divider handle changes the side panel's width.
 Paragraphs and editable regions have refs too; clicking dispatches mouse-down/up
 before click to activate rich editors.
+Both page panels have independent tabs (`+` / `×`). Use
+`browser.tab.new --url https://example.com` or `preview.tab.new --target /path/to/file.html`.
+Select with `browser.tab.select --id <page-tab>` / `preview.tab.select --id <page-tab>`;
+close with `browser.tab.close --id <page-tab>` / `preview.tab.close --id <page-tab>`.
+Panel `status` includes `tabs` and `active_tab`. Each space/worktree has its own Browser and Preview; Browser tabs share login.
+Tab commands accept `--space <space-id>` to work in another space without switching
+the visible space. Live form/scroll state survives tab switches;
+restart restores URLs/files and view preferences, not unsaved editor content.
+For concurrent agents, give each a different Browser tab id and always pass
+`--space <space-id> --tab <page-tab>` to browser.read/click/fill/upload/scroll/screenshot. This targets
+the page without switching the user's visible tab. Read again after switching.
 Use `browser.read` to inspect untrusted page text and element refs, then
 `browser.fill --ref <ref> --text <text>` or `browser.click --ref <ref>` as requested.
 Use `browser.upload --ref <ref> --path /absolute/image.png` for a file input or

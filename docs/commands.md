@@ -195,6 +195,60 @@ Set Preview page zoom (0.25–2.0) or automatic width fit.
 | `zoom` | no |
 | `fit` | no |
 
+## `browser.tab.new`
+
+Open a new Browser page tab, optionally at a website or search.
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `url` | no |
+
+## `browser.tab.select`
+
+Select a Browser page tab by its id from status.
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `id` | yes |
+
+## `browser.tab.close`
+
+Close a Browser page tab (default: active); closing the last leaves a fresh tab.
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `id` | no |
+
+## `preview.tab.new`
+
+Open a new Preview page tab, optionally at an artifact or development URL.
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `target` | no |
+
+## `preview.tab.select`
+
+Select a Preview page tab in the current space by id from status.
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `id` | yes |
+
+## `preview.tab.close`
+
+Close a Preview page tab in the current space (default: active).
+
+| Argument | Required |
+|---|---|
+| `space` | no |
+| `id` | no |
+
 ## `browser.open`
 
 Show Browser, optionally opening a website or search (default: the last page or Naver Blog).
@@ -237,6 +291,8 @@ Read visible page text and element refs, including accessible frames (CLI). Page
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `limit` | no |
 
 ## `browser.click`
@@ -245,6 +301,8 @@ Click an element ref from browser.read (CLI).
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `ref` | yes |
 
 ## `browser.fill`
@@ -253,6 +311,8 @@ Fill an input or contenteditable ref from browser.read (CLI). Passwords and veri
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `ref` | yes |
 | `text` | yes |
 
@@ -262,6 +322,8 @@ Upload an explicitly selected local PNG/JPEG/WebP image through a file input or 
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `ref` | yes |
 | `path` | yes |
 
@@ -271,6 +333,8 @@ Scroll Browser or an element by pixels (CLI).
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `ref` | no |
 | `x` | no |
 | `y` | no |
@@ -281,6 +345,8 @@ Capture the visible native Browser page to an absolute PNG path (CLI).
 
 | Argument | Required |
 |---|---|
+| `space` | no |
+| `tab` | no |
 | `path` | yes |
 
 ## `space.select`
