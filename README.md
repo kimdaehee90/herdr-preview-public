@@ -32,6 +32,8 @@ git clone --depth 1 https://github.com/kimdaehee90/herdr-preview-public.git "$HO
 새 로컬 macOS GUI 패인은 `NO_COLOR` 변수를 완전히 제거합니다. 빈 문자열로만 바꾸면 Codex 하단 상태줄의 색상이 여전히 꺼지는 문제까지 처리합니다.
 이미 실행 중인 프로그램의 환경은 유지하므로, 기존 프로그램은 작업을 마친 뒤 새 GUI 패인에서 다시 열어야 색상이 적용됩니다.
 
+설치기는 맥마다 기기 전용 코드 서명 인증서를 만들고 이후 업데이트에도 재사용합니다. 이전 버전과 새 버전의 임시 서명이 충돌해 폴더 접근을 반복 요청하는 문제를 방지합니다. 서명 키는 `~/Library/Application Support/Herdr Preview/Signing`에만 두며 GitHub로 전송하지 않습니다. 최초 전환 시 macOS의 폴더 접근 허용이 한 번 필요할 수 있습니다. 시스템 신뢰 설정과 전체 디스크 접근 권한은 변경하지 않습니다.
+
 웹사이트 로그인은 설치한 맥북에서 직접 진행합니다. 공개 패키지에 쿠키·계정 비밀값·게시글 초안·대화·코어 세션은 포함하지 않습니다.
 프로그램은 `~/Applications/Herdr Preview.app`, 설정은 `~/.config/herdr-preview`, 명령은 `~/.local/bin/herdr-preview`입니다.
 기존 개인 앱과 설정은 `~/Library/Application Support/Herdr Personal/backups/`에 보관하며 설치 오류 시 복구합니다.

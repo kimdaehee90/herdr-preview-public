@@ -35,6 +35,8 @@
     "defaults/mods/agents-personal/main.js",
     "defaults/mods/agents-personal/agent-list.js",
     "defaults/mods/workspace-status-personal/main.js",
-    "src/preview/tabs.rs"
+    "src/preview/tabs.rs",
+    "distribution/macos-signing.py",
+    "scripts/native-qa.py"
   ]
 }

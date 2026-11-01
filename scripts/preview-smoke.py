@@ -201,8 +201,14 @@ try:
     wait(lambda:probe("document.contentType==='image/png'"),'Restore fixture did not load')
     do('preview.view',zoom=.67)
     expected_tabs=[t['id'] for t in call({'status':True})['preview']['tabs']]
+    prior_pid=int((home.parent/'app.pid').read_text()) if (home.parent/'app.pid').exists() else None
     do('app.quit')
     if owned_process:owned_process.wait(timeout=10)
+    elif prior_pid:
+        def prior_exited():
+            try:os.kill(prior_pid,0);return False
+            except ProcessLookupError:return True
+        wait(prior_exited,'Previous QA GUI did not quit')
     env={**os.environ,'HERDR_APP_HOME':str(home),'HERDR_APP_ID':'herdr-preview-test','HC_SESSION':args.session,'HERDR_PREVIEW_TEST_CONTROL':'1'}
     log=(home.parent/'preview-restore.log').open('ab')
     owned_process=subprocess.Popen([str((args.binary or root/'target/debug/herdr-app').resolve())],env=env,stdout=log,stderr=log)

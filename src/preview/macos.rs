@@ -924,34 +924,37 @@ impl Render for Preview {
             .text_color(color("foreground"))
             .text_size(px(12.))
             .child(
-                div().id("page-toolbar").h(px(34.)).px(px(6.)).gap(px(2.)).flex_none()
-                    .flex().items_center().overflow_x_scroll().border_b_1().border_color(color("border"))
-                    .child(div().flex_none().mr(px(4.)).font_weight(FontWeight::SEMIBOLD)
-                        .child(if self.is_browser { "Browser" } else { "Preview" }))
-                    .child(self.button("preview-back", "←", cx, |this,w,cx|this.navigate_artifact_history(false,w,cx)))
-                    .child(self.button("preview-forward", "→", cx, |this,w,cx|this.navigate_artifact_history(true,w,cx)))
-                    .child(self.button("preview-reload", if self.loading { "…" } else { "↻" }, cx, |this,_,cx|this.reload(cx)))
-                    .child(self.button("page-fit", if self.fit_width { "맞춤 ✓" } else { "맞춤" }, cx, |this,w,cx| {
-                        let _=this.configure_view(&json!({"fit":!this.fit_width}),w,cx);
-                    }))
-                    .child(self.button("page-zoom-out", "−", cx, |this,w,cx|this.step_zoom(false,w,cx)))
-                    .child(div().id("page-zoom-reset").w(px(38.)).h(px(28.)).flex_none().flex().items_center().justify_center()
-                        .rounded(px(5.)).cursor_pointer().text_color(color("muted")).hover(|s|s.bg(color("hover")))
-                        .child(format!("{:.0}%",self.page_zoom*100.))
-                        .on_click(cx.listener(|this,_,w,cx|{let _=this.configure_view(&json!({"zoom":1.0}),w,cx);})))
-                    .child(self.button("page-zoom-in", "+", cx, |this,w,cx|this.step_zoom(true,w,cx)))
-                    .when(self.is_browser, |d|d
-                        .child(self.button("page-device", if self.mobile { "모바일" } else { "PC" }, cx, |this,w,cx|{
-                            let _=this.configure_view(&json!({"mobile":!this.mobile}),w,cx);
+                div().id("page-toolbar").h(px(34.)).px(px(6.)).gap(px(4.)).flex_none()
+                    .flex().items_center().justify_between().overflow_x_scroll().border_b_1().border_color(color("border"))
+                    .child(div().flex_none().flex().items_center().gap(px(2.))
+                        .child(div().flex_none().mr(px(4.)).font_weight(FontWeight::SEMIBOLD)
+                            .child(if self.is_browser { "Browser" } else { "Preview" }))
+                        .child(self.button("preview-back", "←", cx, |this,w,cx|this.navigate_artifact_history(false,w,cx)))
+                        .child(self.button("preview-forward", "→", cx, |this,w,cx|this.navigate_artifact_history(true,w,cx)))
+                        .child(self.button("preview-reload", if self.loading { "…" } else { "↻" }, cx, |this,_,cx|this.reload(cx))))
+                    .child(div().flex_none().flex().items_center().gap(px(2.))
+                        .child(self.button("page-fit", if self.fit_width { "맞춤 ✓" } else { "맞춤" }, cx, |this,w,cx| {
+                            let _=this.configure_view(&json!({"fit":!this.fit_width}),w,cx);
                         }))
-                        .child(self.button("browser-home", "블로그", cx, |this,w,cx|{
-                            let _=this.open("https://blog.naver.com/",&this.cwd.clone(),w,cx);
-                        })))
-                    .when(!self.is_browser, |d|d
-                        .child(self.button("preview-open", "파일", cx, |this,w,cx|this.choose(w,cx)))
-                        .when(self.server.is_some(),|d|d.child(self.button("preview-auto",if self.auto { "자동 ✓" } else { "자동" },cx,|this,_,cx|{
-                            this.auto=!this.auto;cx.notify();
-                        })))),
+                        .child(self.button("page-zoom-out", "−", cx, |this,w,cx|this.step_zoom(false,w,cx)))
+                        .child(div().id("page-zoom-reset").w(px(38.)).h(px(28.)).flex_none().flex().items_center().justify_center()
+                            .rounded(px(5.)).cursor_pointer().text_color(color("muted")).hover(|s|s.bg(color("hover")))
+                            .child(format!("{:.0}%",self.page_zoom*100.))
+                            .on_click(cx.listener(|this,_,w,cx|{let _=this.configure_view(&json!({"zoom":1.0}),w,cx);})))
+                        .child(self.button("page-zoom-in", "+", cx, |this,w,cx|this.step_zoom(true,w,cx))))
+                    .child(div().flex_none().flex().items_center().gap(px(2.))
+                        .when(self.is_browser, |d|d
+                            .child(self.button("page-device", if self.mobile { "모바일" } else { "PC" }, cx, |this,w,cx|{
+                                let _=this.configure_view(&json!({"mobile":!this.mobile}),w,cx);
+                            }))
+                            .child(self.button("browser-home", "블로그", cx, |this,w,cx|{
+                                let _=this.open("https://blog.naver.com/",&this.cwd.clone(),w,cx);
+                            })))
+                        .when(!self.is_browser, |d|d
+                            .child(self.button("preview-open", "파일", cx, |this,w,cx|this.choose(w,cx)))
+                            .when(self.server.is_some(),|d|d.child(self.button("preview-auto",if self.auto { "자동 ✓" } else { "자동" },cx,|this,_,cx|{
+                                this.auto=!this.auto;cx.notify();
+                            }))))),
             )
             .child(
                 div().h(px(34.)).p(px(3.)).gap(px(4.)).flex_none().flex().items_center()

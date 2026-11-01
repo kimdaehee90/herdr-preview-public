@@ -101,6 +101,16 @@ Use `scripts/personal-update.py backup`, `prepare <upstream-ref>` (after committ
 personal source), then `validate` in the candidate worktree. A conflict or failed
 check leaves the installed app untouched. `scripts/install-preview-macos --validated`
 requires the same validated source/binary and completed isolated native UI checks.
+Local installers use a stable device-local signing certificate under
+`~/Library/Application Support/Herdr Preview/Signing`. Keep its private keychain
+and identity for future updates; never put it in Git or copy it to another Mac.
+The keychain is separate from login credentials, locked after signing, and does
+not add a trusted root or grant TCC/full disk permissions. Retained old app
+bundles are signed with the same identity because live PTYs may retain them as
+their macOS responsibility parent. One initial macOS folder permission consent
+can be required when migrating from ad-hoc builds. Quit only the GUI before
+installation. Native QA runs from `/private/tmp` to avoid repeated protected
+Desktop-folder requests.
 Every install backs up the previous app, source, settings and a best-effort live
 WebKit profile copy outside the repository. Never restore a profile while it runs.
 Backups also include `~/.local/state/herdr-core` session/layout files (excluding

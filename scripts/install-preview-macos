@@ -50,6 +50,11 @@ fcntl.flock(lock, fcntl.LOCK_EX)
 saved = json.loads(subprocess.check_output([sys.executable,str(root/'scripts/personal-update.py'),'backup'],cwd=root,text=True))
 backup = saved['backup']
 config.mkdir(parents=True, exist_ok=True)
+import socket
+with socket.socket(socket.AF_UNIX) as probe:
+    try:probe.connect(str(config/'herdr-app.sock'))
+    except OSError:pass
+    else:raise RuntimeError('Quit only Herdr Preview before installing; keep the core and AI programs running.')
 stage = Path(tempfile.mkdtemp(prefix='.HerdrPreview-stage-',dir=app.parent))
 staged_app = stage / app.name
 binary = staged_app / 'Contents/MacOS/HerdrPreview'
@@ -92,7 +97,14 @@ info = {
 record = {'schema':1,'source_head':head,'source_dirty':dirty,'source_root':str(root),'backup':backup,'identity':identity}
 (resources/'PersonalBuild.json').write_text(json.dumps(record,indent=2)+'\n')
 with (staged_app / 'Contents' / 'Info.plist').open('wb') as output: plistlib.dump(info, output)
-subprocess.run(['codesign', '--force', '--sign', '-', str(staged_app)], check=True)
+spec=importlib.util.spec_from_file_location('local_signing',root/'distribution/macos-signing.py')
+local_signing=importlib.util.module_from_spec(spec);spec.loader.exec_module(local_signing)
+signing=local_signing.sign(staged_app,user)
+# Retained bundles may still be the macOS responsibility parent of live PTYs.
+# Keep their identities compatible before moving the current bundle.
+for retained in [app,*app.parent.glob('.HerdrPreview-previous-*.app')]:
+    if retained.exists() and plistlib.loads((retained/'Contents/Info.plist').read_bytes()).get('CFBundleIdentifier')==policy['bundle_id']:
+        local_signing.sign(retained,user)
 subprocess.run(['codesign', '--verify', '--deep', '--strict', str(staged_app)], check=True)
 previous = app.with_name('.HerdrPreview-previous-' + uuid.uuid4().hex[:8] + '.app')
 try:

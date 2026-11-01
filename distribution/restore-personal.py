@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -164,7 +165,12 @@ def install(root, home, core=None, dry_run=False, native=True, register=True):
                 'PATH':str(home/'.local/bin')+':/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
             (candidate/'Contents/Info.plist').write_bytes(plistlib.dumps(plist))
             if native:
-                subprocess.run(['codesign','--force','--sign','-',str(candidate)],check=True)
+                spec=importlib.util.spec_from_file_location('local_signing',Path(__file__).with_name('macos-signing.py'))
+                signing=importlib.util.module_from_spec(spec);spec.loader.exec_module(signing)
+                signing.sign(candidate,home)
+                # A preserved core can still attribute its PTYs to old bundles.
+                for retained in [app,*app.parent.glob('.HerdrPreview-previous-*.app')]:
+                    if retained.exists() and plistlib.loads((retained/'Contents/Info.plist').read_bytes()).get('CFBundleIdentifier')=='dev.herdr.preview':signing.sign(retained,home)
                 subprocess.run(['codesign','--verify','--deep','--strict',str(candidate)],check=True)
             config.mkdir(parents=True,exist_ok=True)
             previous=backup/app.name

@@ -197,35 +197,11 @@ def validate(root, tools_root):
         with (logs / f'check-{i}.log').open('w') as output:
             subprocess.run(command, cwd=root, env=env, stdout=output, stderr=subprocess.STDOUT, check=True)
     session = 'up' + uuid.uuid4().hex[:6]
-    home = root / '.browser-test/app'
-    if (home / 'herdr-app.sock').exists():
-        with socket.socket(socket.AF_UNIX) as client:
-            try:
-                client.connect(str(home/'herdr-app.sock'))
-            except OSError:
-                pass
-            else:
-                raise RuntimeError('QA home is already in use; refusing to touch its app/core')
-    native = [
-        ['python3','scripts/browser-smoke.py','--home',str(home),'--binary',str(root/'target/debug/herdr-app'),'--session',session],
-        ['python3','scripts/preview-smoke.py','--home',str(home),'--session',session],
-        ['python3','scripts/browser-focus-smoke.py','--session',session],
-    ]
-    try:
-        for i, command in enumerate(native):
-            with (logs / f'native-{i}.log').open('w') as output:
-                subprocess.run(command,cwd=root,env=env,stdout=output,stderr=subprocess.STDOUT,check=True)
-    finally:
-        # Only the uniquely named validation core may be stopped.
-        with socket.socket(socket.AF_UNIX) as client:
-            client.settimeout(3)
-            try:
-                client.connect(str(home/'herdr-app.sock'))
-                client.sendall(b'{"do":"app.quit"}\n')
-                client.recv(1024)
-            except OSError:
-                pass
-        subprocess.run([str(Path.home()/'.local/bin/hc'),'server','stop'],env={**env,'HC_SESSION':session},capture_output=True)
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('native_qa',root/'scripts/native-qa.py')
+    qa=importlib.util.module_from_spec(spec);spec.loader.exec_module(qa)
+    native_result=qa.run(root,root/'target/debug/herdr-app',session,logs=logs)
+    native=native_result['commands']
     result = verify_candidate(root, root/'target/release/herdr-app')
     result.update({'checks':steps+native,'installed':False,'native_ui_checks_passed':True})
     (logs/'validated.json').write_text(json.dumps(result, indent=2) + '\n')
