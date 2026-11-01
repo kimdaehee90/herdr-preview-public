@@ -92,8 +92,8 @@ running terminals. Old app bundles remain available until their GUI exits.
 `browser.view '{"fit":true}'` fits a wide page to the panel;
 `browser.view '{"zoom":0.75}'` sets a manual scale and
 `browser.view '{"mobile":true}'` reloads with the mobile site mode.
-Preview has `preview.view` for zoom/fit. The panels expose these controls below
-the address bar, and the center divider handle changes the side panel's width.
+Preview has `preview.view` for zoom/fit. The panels combine these controls with the back/forward buttons in one toolbar
+above the address bar, and the center divider handle changes the side panel's width.
 Paragraphs and editable regions have refs too; clicking dispatches mouse-down/up
 before click to activate rich editors.
 Both page panels have independent tabs (`+` / `×`). Use

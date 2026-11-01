@@ -208,7 +208,7 @@ def validate(root, tools_root):
                 raise RuntimeError('QA home is already in use; refusing to touch its app/core')
     native = [
         ['python3','scripts/browser-smoke.py','--home',str(home),'--binary',str(root/'target/debug/herdr-app'),'--session',session],
-        ['python3','scripts/preview-smoke.py','--home',str(home)],
+        ['python3','scripts/preview-smoke.py','--home',str(home),'--session',session],
         ['python3','scripts/browser-focus-smoke.py','--session',session],
     ]
     try:

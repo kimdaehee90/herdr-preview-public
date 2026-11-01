@@ -37,7 +37,7 @@ def call(command):
             if not chunk: break
             reply += chunk
     data = json.loads(reply)
-    if 'error' in data: raise RuntimeError(data['error'])
+    if data.get('error') is not None: raise RuntimeError(data['error'])
     return data
 
 def do(command_name, **kwargs):
@@ -195,6 +195,29 @@ try:
     passed('Folder changes close old servers; artifact Back reopens with a fresh scoped server')
     do('preview.open', target=str(root / 'examples' / 'preview' / 'index.html'))
     visible(True)
+    # Restore the selected artifact tab with lazy inactive pages after restart.
+    html_tab=call({'status':True})['preview']['active_tab']
+    restore_image=do('preview.tab.new',target=str(artifacts/'sample.png'))['tab'];visible(True)
+    wait(lambda:probe("document.contentType==='image/png'"),'Restore fixture did not load')
+    do('preview.view',zoom=.67)
+    expected_tabs=[t['id'] for t in call({'status':True})['preview']['tabs']]
+    do('app.quit')
+    if owned_process:owned_process.wait(timeout=10)
+    env={**os.environ,'HERDR_APP_HOME':str(home),'HERDR_APP_ID':'herdr-preview-test','HC_SESSION':args.session,'HERDR_PREVIEW_TEST_CONTROL':'1'}
+    log=(home.parent/'preview-restore.log').open('ab')
+    owned_process=subprocess.Popen([str((args.binary or root/'target/debug/herdr-app').resolve())],env=env,stdout=log,stderr=log)
+    def restarted():
+        try:return call({'status':True})
+        except OSError:return None
+    wait(restarted,'Preview app did not restart')
+    do('layout.select',stack='panel-body',child='preview');visible(True)
+    wait(lambda:probe("document.contentType==='image/png'"),'Selected image did not restore')
+    restored=call({'status':True})['preview']
+    assert restored['active_tab']==restore_image and restored['page_zoom']==.67
+    assert [t['id'] for t in restored['tabs']]==expected_tabs and sum(t['materialized'] for t in restored['tabs'])==1
+    do('preview.tab.select',id=html_tab);visible(True)
+    wait(lambda:probe("!!document.querySelector('#counter')"),'Lazy HTML tab did not restore')
+    passed('Preview restores file tabs, selected image and per-tab zoom after restart; inactive tabs load lazily')
     report = {'checks': results, 'count': len(results), 'all_passed': True,
               'note': 'DOM input/click events in a native WebView; OS keyboard and IME composition are not synthesized.'}
     (home.parent / 'smoke-results.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))

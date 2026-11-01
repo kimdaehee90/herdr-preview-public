@@ -125,7 +125,8 @@ opens with HTTPS; ordinary text searches Naver. Local files belong in Preview.
 
 Both page panels have width-fit, minus/plus and a clickable zoom percentage
 (reset to 100%). Width-fit is on by default and remeasures after navigation
-or a panel width change. The visible handle between the terminal and side panel
+or a panel width change. Fit/zoom and the PC/mobile toggle share the navigation toolbar; the address bar
+is the only row below it. The visible handle between the terminal and side panel
 drags the panel width. `preview.view {zoom?, fit?}` changes an artifact view;
 `browser.view {zoom?, fit?, mobile?}` changes Browser. Zoom is 0.25–2.0;
 setting zoom disables auto-fit. Mobile mode changes the page's user agent and
