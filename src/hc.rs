@@ -389,12 +389,13 @@ impl Core {
     /// Starts a program in a new core terminal and returns its address (`tN`).
     /// Starts a terminal, here or on another machine (`on`: its name in `hc machine ls`).
     pub fn run(&self, argv: Vec<String>, cwd: Option<String>, labels: Value, on: Option<&str>) -> Result<String> {
-        // An agent/installer can start the core with NO_COLOR=1 for its own
-        // machine-readable commands. GUI terminals have a real color display;
-        // don't let that inherited setting silently disable their ANSI output.
-        // Empty follows the NO_COLOR convention and works with existing cores'
-        // string-only environment overlay, without restarting their terminals.
-        let env = json!({"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "herdr", "NO_COLOR": ""});
+        // A string-only core env overlay cannot remove NO_COLOR. Codex's TUI
+        // disables footer colors even for an empty value (unlike its --help).
+        // Unset it in the new local macOS child, without restarting the core
+        // or changing a remote machine's shell/platform/environment.
+        #[cfg(target_os = "macos")]
+        let argv = if on.is_none() { macos_gui_argv(argv) } else { argv };
+        let env = json!({"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "herdr"});
         let r = self.call("terminal.run", json!({"argv": argv, "cwd": cwd, "env": env, "labels": labels, "on": on, "keep": true}))?;
         r.get("address")
             .and_then(Value::as_str)
@@ -472,9 +473,36 @@ impl Drop for Core {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
+fn macos_gui_argv(argv: Vec<String>) -> Vec<String> {
+    // Arguments are positional data, never interpolated into shell source.
+    // An empty command starts the core's inherited user shell as a login
+    // shell, matching local macOS terminal startup. exec keeps signals/PIDs.
+    let mut run = vec!["/bin/sh".into(), "-c".into(),
+        "unset NO_COLOR; if [ \"$#\" -eq 0 ]; then exec \"${SHELL:-/bin/zsh}\" -l; fi; exec \"$@\"".into(),
+        "herdr-gui".into()];
+    run.extend(argv);
+    run
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn macos_gui_removes_even_empty_no_color_and_preserves_arguments_and_exit() {
+        let arguments = vec!["a 'quote'; $(not-a-command)\nnext".to_owned(), "".to_owned()];
+        for value in ["", "1"] {
+            let mut command = vec!["/bin/sh".into(), "-c".into(),
+                "[ \"${NO_COLOR+x}\" != x ] || exit 99; printf '<%s>\\n' \"$@\"; exit 23".into(), "probe".into()];
+            command.extend(arguments.clone());
+            let run = macos_gui_argv(command);
+            let out = std::process::Command::new(&run[0]).args(&run[1..]).env("NO_COLOR", value).output().unwrap();
+            assert_eq!(out.status.code(), Some(23));
+            assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("<{}>\n<>\n", arguments[0]));
+        }
+    }
 
     #[test]
     fn the_event_stream_keeps_the_terminals_as_the_core_has_them() {

@@ -136,12 +136,21 @@ def start():
 start()
 try:
  space=wait(lambda:do('space.new',name='Browser 검증',folder=str(root/'examples/preview')).get('space'),'Test core layout did not connect')
- probe=do('terminal.open',argv=['/bin/sh','-c','if [ -n "${NO_COLOR:-}" ]; then printf "HERDR_COLOR_SUPPRESSED\\n"; else printf "HERDR_COLOR_ENABLED\\n"; fi'],place='tab',name='Color inheritance')
+ probe=do('terminal.open',argv=['/bin/sh','-c','if [ "${NO_COLOR+x}" = x ]; then printf "HERDR_COLOR_SUPPRESSED\\n"; else printf "HERDR_COLOR_ENABLED\\n"; fi'],place='tab',name='Color inheritance')
  def color_ready():
   output=subprocess.check_output([str(Path.home()/'.local/bin/hc'),'read',probe['terminal'],'--lines','8'],env={**os.environ,'HC_SESSION':args.session},text=True)
   return 'HERDR_COLOR_ENABLED' in output and 'HERDR_COLOR_SUPPRESSED' not in output
  wait(color_ready,'GUI terminal inherited NO_COLOR from an agent-started core')
- passed('New GUI terminals restore ANSI colors even when their core inherited NO_COLOR=1')
+ passed('Explicit GUI commands remove NO_COLOR entirely, including an empty value')
+ shell_probe=do('terminal.open',place='tab',name='Default shell color inheritance')
+ subprocess.run([str(Path.home()/'.local/bin/hc'),'send',shell_probe['terminal'],
+  'if [ "${NO_COLOR+x}" = x ]; then printf "HERDR_DEFAULT_SUPPRESSED\\n"; else printf "HERDR_DEFAULT_ENABLED\\n"; fi'],
+  env={**os.environ,'HC_SESSION':args.session},check=True,capture_output=True)
+ def default_color_ready():
+  output=subprocess.check_output([str(Path.home()/'.local/bin/hc'),'read',shell_probe['terminal'],'--lines','8'],env={**os.environ,'HC_SESSION':args.session},text=True)
+  return any(line.strip()=='HERDR_DEFAULT_ENABLED' for line in output.splitlines())
+ wait(default_color_ready,'Default GUI shell retained NO_COLOR')
+ passed('Default GUI login shells also remove NO_COLOR before a manually launched agent')
  do('browser.open',url=url+'wide')
  do('browser.view',zoom=1.0,fit=True,mobile=False)
  def fitted():
