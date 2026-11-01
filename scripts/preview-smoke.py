@@ -123,7 +123,7 @@ try:
     do('preview.tab.select',id=first_tab);visible(True)
     assert probe("document.getElementById('count').textContent")=='2'
     assert call({'status':True})['preview']['page_zoom']==.75
-    assert sum(t['visible'] for t in call({'status':True})['preview']['tabs'])==1
+    wait(lambda:sum(t['visible'] for t in call({'status':True})['preview']['tabs'])==1,'Selected Preview visibility did not settle')
     passed('Preview artifact tabs retain independent live documents and zoom when switching')
     empty_tab=do('preview.tab.new')['tab']
     wait(lambda:not any(t['visible'] for t in call({'status':True})['preview']['tabs']),'Old Preview remained visible behind a fresh tab')

@@ -335,7 +335,8 @@ try:
  do('browser.tab.select',id=tab_a);data=read_ready()
  assert next(e for e in data['elements'] if e['label']=='제목')['value']=='agent-A edit'
  assert status()['browser']['page_zoom']==.75
- assert sum(t['visible'] for t in status()['browser']['tabs'])==1
+ wait(lambda:sum(t['visible'] for t in status()['browser']['tabs'])==1,'Selected Browser visibility did not settle')
+ call({'shot':str(home.parent/'tabs-native.png')})
  passed('Agents can edit their own background tab without changing selection; forms and view choices survive switching')
  # A delayed editor verification must not report success after a tab switch.
  result={};pending_ref=ref(page(),'지연 모델')
@@ -348,6 +349,17 @@ try:
  assert do('browser.fill',space=owner_b,tab=work_b,ref=ref(data,'제목'),text='worktree-B')['ok']
  data_a=do('browser.read',space=owner_a,tab=tab_a)
  assert do('browser.fill',space=owner_a,tab=tab_a,ref=ref(data_a,'제목'),text='worktree-A')['ok']
+ data_b=page();data_a=do('browser.read',space=owner_a,tab=tab_a);parallel={}
+ workers=[threading.Thread(target=lambda:parallel.update(a=do('browser.fill',space=owner_a,tab=tab_a,ref=ref(data_a,'제목'),text='worktree-A'))),
+          threading.Thread(target=lambda:parallel.update(b=do('browser.fill',space=owner_b,tab=work_b,ref=ref(data_b,'제목'),text='worktree-B')))]
+ for worker in workers:worker.start()
+ for worker in workers:worker.join(8)
+ assert all(not w.is_alive() for w in workers) and parallel['a'].get('ok') and parallel['b'].get('ok'),parallel
+ background=do('browser.tab.new',space=owner_a,url=url+'tab-two')['tab']
+ assert status()['space']==owner_b and status()['browser']['active_tab']==work_b
+ assert 'error' in do('browser.tab.close',space=owner_a,id=123)
+ do('browser.tab.close',space=owner_a,id=background)
+ passed('Two space-owned browser tabs accept simultaneous input; background tab management never switches the visible workspace')
  assert next(e for e in page()['elements'] if e['label']=='제목')['value']=='worktree-B'
  do('space.select',id=owner_a);do('browser.open');data=read_ready()
  assert status()['browser']['active_tab']==tab_b and len(status()['browser']['tabs'])==2
