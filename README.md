@@ -27,6 +27,9 @@ git clone --depth 1 https://github.com/kimdaehee90/herdr-preview-public.git "$HO
 - 상태 보고가 없는 알려진 AI 프로세스도 표시하는 개인 Agents 모듈.
 - D2Coding·Pretendard 글꼴, 단축키, 개인 화면 배치, 업데이트 시 사용자 수정 보존.
 
+새 GUI 패인은 설치 도구나 에이전트에서 코어로 넘어온 `NO_COLOR=1` 때문에 색상이 꺼지지 않도록 처리합니다.
+이미 실행 중인 프로그램의 환경은 유지하므로, 기존 프로그램은 작업을 마친 뒤 새 GUI 패인에서 다시 열어야 색상이 적용됩니다.
+
 웹사이트 로그인은 설치한 맥북에서 직접 진행합니다. 공개 패키지에 쿠키·계정 비밀값·게시글 초안·대화·코어 세션은 포함하지 않습니다.
 프로그램은 `~/Applications/Herdr Preview.app`, 설정은 `~/.config/herdr-preview`, 명령은 `~/.local/bin/herdr-preview`입니다.
 기존 개인 앱과 설정은 `~/Library/Application Support/Herdr Personal/backups/`에 보관하며 설치 오류 시 복구합니다.
