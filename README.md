@@ -16,9 +16,13 @@ git clone --depth 1 https://github.com/kimdaehee90/herdr-preview-public.git "$HO
 
 GitHub 로그인 없이 설치할 수 있습니다. 설치 후 오른쪽 위의 **Preview** 또는 **Browser**를 누르세요.
 기본 앱 설치 방법은 [원본 저장소 안내](https://github.com/herdrdev/herdr-app#install)를 참고하세요.
-PPT/PPTX를 보려면 LibreOffice도 필요합니다. 이미 설치되어 있으면 그대로 사용하며,
-없다면 [공식 LibreOffice](https://www.libreoffice.org/download/download-libreoffice/)를
-응용 프로그램 폴더에 설치하세요. PDF와 PNG는 추가 변환 도구 없이 사용할 수 있습니다.
+PPT/PPTX를 보려면 LibreOffice도 필요합니다. macOS에서는
+[공식 LibreOffice 26.2.6 (Apple Silicon)](https://download.documentfoundation.org/libreoffice/stable/26.2.6/mac/aarch64/LibreOffice_26.2.6_MacOS_aarch64.dmg)을
+응용 프로그램 폴더에 설치하세요. 26.8.2에서는 백그라운드 변환 시 macOS 글꼴을 읽지 못해
+한글이 사라지는 증상을 확인했습니다([관련 보고](https://bugs.documentfoundation.org/show_bug.cgi?id=173306)).
+해당 버전이 설치되어 있다면 26.2.6으로 교체한 뒤 PPT 탭을 새로고침하세요.
+원본에서 사용하는 글꼴이 없으면 설치된 글꼴로 대체됩니다.
+PDF와 PNG는 추가 변환 도구 없이 사용할 수 있습니다.
 
 ## 이미 설치했다면 업데이트
 
