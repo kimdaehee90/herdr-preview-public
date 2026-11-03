@@ -25,6 +25,15 @@ def archive(owner='',mtime=0):
 
 
 class Privacy(unittest.TestCase):
+    def test_public_repository_handle_does_not_hide_private_paths_or_email(self):
+        handle=b'kim'+b'dae'+b'hee90'
+        local_name=handle[3:9]
+        audit.scan(b'https://github.com/'+handle+b'/repo '+handle+b'@users.noreply.github.com','public repo',[local_name])
+        for value in [b'/Users/'+local_name+b'/project',local_name+b'@example.invalid',b'host-'+local_name+b'-private',
+                      b'/Users/'+handle+b'/private',handle+b'@example.invalid',handle+b'.local']:
+            with self.assertRaisesRegex(RuntimeError,'Private producer'):
+                audit.scan(value,'private content',[b'/Users/'+local_name,local_name])
+
     def test_private_identifiers_and_credentials_are_rejected_without_echoing(self):
         with self.assertRaisesRegex(RuntimeError,'Private producer'):
             audit.scan(b'private-path/example','binary',[b'private-path'])

@@ -3121,13 +3121,19 @@ impl AppWindow {
                 };
             }
             "preview.open" => {
-                let Some(target) = Self::arg(a, "target") else { return self.fail("preview.open needs target"); };
+                let targets:Vec<String>=if let Some(values)=a.get("targets") {
+                    if a.get("target").is_some(){return self.fail("Use target or targets, not both.");}
+                    let Some(values)=values.as_array() else{return self.fail("targets must be a nonempty array of file paths");};
+                    if values.is_empty() || values.iter().any(|v|!v.is_string()){return self.fail("targets must be a nonempty array of file paths");}
+                    values.iter().filter_map(Value::as_str).map(str::to_owned).collect()
+                } else if let Some(target)=Self::arg(a,"target"){vec![target.to_owned()]}
+                else {return self.fail("preview.open needs target or targets");};
                 let cwd = self.model.active.as_deref().map(|s| self.folder_for(s)).unwrap_or_else(home);
-                if self.model.active_space().is_some_and(|s| s.machine.is_some()) && !target.starts_with("http://") && !target.starts_with("https://") {
+                if self.model.active_space().is_some_and(|s| s.machine.is_some()) && targets.iter().any(|t|!t.starts_with("http://")&&!t.starts_with("https://")) {
                     return self.fail("Preview opens files on this Mac. For a remote app, enter a reachable HTTP(S) development server URL.");
                 }
                 let view = self.ensure_preview(window, cx);
-                if let Err(error) = view.update(cx, |p, cx| p.open(target, &cwd, window, cx)) { return self.fail(error); }
+                if let Err(error) = view.update(cx, |p, cx| p.open_selection(&targets, &cwd, window, cx)) { return self.fail(error); }
                 mods::set_shared("preview.open_request".into(), json!({"space": self.model.active.as_deref().unwrap_or("")}));
                 mods::set_shared("browser.open_request".into(), Value::Null);
                 if let Some(panel) = self.chrome.find_mut("panel") { panel.hidden = false; }

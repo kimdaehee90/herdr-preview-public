@@ -23,7 +23,7 @@ root = Path(__file__).resolve().parent.parent
 assert home in {root/'.preview-test/app',root/'.browser-test/app'}, 'Use an isolated QA home only'
 artifacts = home.parent / 'artifacts'
 shutil.copytree(root / 'examples' / 'preview', artifacts, dirs_exist_ok=True)
-(artifacts / 'sample.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII='))
+(artifacts / 'sample.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII='))
 results = []
 
 def call(command):

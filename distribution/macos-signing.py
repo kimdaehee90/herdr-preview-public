@@ -43,17 +43,17 @@ def ensure_identity(directory):
         stage=Path(temporary);stage.chmod(0o700)
         config=stage/'certificate.cnf'
         config.write_text('[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=Herdr Preview Local\n[ext]\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=codeSigning\n')
-        env={**os.environ,'HERDR_LOCAL_P12_PASSWORD':secrets.token_urlsafe(48)}
         created=False
         try:
             command(['openssl','req','-new','-x509','-newkey','rsa:3072','-nodes','-days','3650','-config',str(config),'-keyout',str(stage/'key.pem'),'-out',str(stage/'certificate.pem')])
             (stage/'key.pem').chmod(0o600)
-            command(['openssl','pkcs12','-export','-inkey',str(stage/'key.pem'),'-in',str(stage/'certificate.pem'),'-out',str(stage/'identity.p12'),'-passout','env:HERDR_LOCAL_P12_PASSWORD'],env=env)
-            (stage/'identity.p12').chmod(0o600)
             command(['security','create-keychain','-p',password,str(chain)]);created=True
             remove_from_search_list(chain)
             command(['security','unlock-keychain','-p',password,str(chain)])
-            command(['security','import',str(stage/'identity.p12'),'-k',str(chain),'-P',env['HERDR_LOCAL_P12_PASSWORD'],'-x','-T','/usr/bin/codesign'])
+            # Native PEM import avoids OpenSSL-version-dependent PKCS#12
+            # encryption/MAC defaults. Keys remain non-extractable after import.
+            command(['security','import',str(stage/'key.pem'),'-k',str(chain),'-x','-T','/usr/bin/codesign'])
+            command(['security','import',str(stage/'certificate.pem'),'-k',str(chain)])
             command(['security','set-key-partition-list','-S','apple-tool:,apple:','-s','-k',password,str(chain)])
             identities=command(['security','find-identity','-p','codesigning',str(chain)])
             match=re.search(r'\b([A-F0-9]{40})\b',identities)
@@ -79,12 +79,27 @@ def sign(app, home, identifier='dev.herdr.preview'):
         if current.is_symlink():raise RuntimeError('Refusing a symlinked local signing directory')
         current=current.parent
     directory.mkdir(parents=True,exist_ok=True,mode=0o700);directory.chmod(0o700)
-    with (directory/'signing.lock').open('a') as lock:
+    # All installs by this OS user share one search-list lock, including
+    # isolated verification homes. No key material is stored in this lock.
+    search_lock=Path(tempfile.gettempdir())/'herdr-preview-signing-search.lock'
+    fd=os.open(search_lock,os.O_WRONLY|os.O_CREAT|os.O_NOFOLLOW|os.O_CLOEXEC,0o600)
+    with os.fdopen(fd,'a') as shared_lock, (directory/'signing.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
+        fcntl.flock(shared_lock,fcntl.LOCK_EX)
         data,chain,password=ensure_identity(directory)
         try:
             command(['security','unlock-keychain','-p',password,str(chain)])
-            command(['codesign','--force','--sign',data['identity'],'--keychain',str(chain),'--identifier',identifier,'--timestamp=none',str(app)])
+            listed=command(['security','list-keychains','-d','user'])
+            paths=re.findall(r'"([^"\n]+)"',listed)
+            added=not any(Path(p).resolve()==chain.resolve() for p in paths)
+            try:
+                # codesign needs certificate-chain discovery even with
+                # --keychain. Searchability grants no trust and lasts only
+                # for this signing call; preserve preexisting list entries.
+                if added:command(['security','list-keychains','-d','user','-s',*paths,str(chain)])
+                command(['codesign','--force','--sign',data['identity'],'--keychain',str(chain),'--identifier',identifier,'--timestamp=none',str(app)])
+            finally:
+                if added:remove_from_search_list(chain)
             command(['codesign','--verify','--deep','--strict',str(app)])
             requirement=command(['codesign','-d','-r-',str(app)]).strip()
             expected='certificate leaf = H"'+data['identity'].lower()+'"'

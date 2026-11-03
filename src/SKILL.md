@@ -174,3 +174,14 @@ Never experiment with pointer/key automation on the person's real display.
 When developing the app on Linux, its `scripts/sandbox` provides an isolated
 home, core and display: `up`, `do`, `status`, `shot`, then `down` when done.
 Never stop a server or session you didn't start.
+
+## Static document pages (personal Preview build)
+
+`preview.open` accepts one `target` (PPT/PPTX, PDF, PNG, HTML or URL), or a
+`targets` array of explicitly selected PNG paths in order. Use only one form.
+The file picker accepts multiple PNGs. `preview.view {page: 2}` jumps to a
+1-based document page; the native controls also offer previous/next and a
+page-number field committed with Enter. `status.preview` includes `page`,
+`pages`, `files` and `document_loading`. PPT uses local LibreOffice conversion;
+PDF uses PDFKit, and original files are not modified. Switching tabs retains
+the current page and image collection. Invalid page numbers leave it unchanged.

@@ -48,9 +48,9 @@ pub const COMMANDS: &[Command] = &[
     cmd("terminal.pin", &[req("terminal"), req("pinned")], "Pin an agent to the top of the agent lists (pinned true) or unpin it (false). Pins are kept with the terminal, so every Herdr client shows them, and end with it."),
     cmd("terminal.kill", &[req("terminal")], "End a terminal and its sub-agents."),
     // What you see.
-    cmd("preview.open", &[req("target")], "Open a local HTML/image file or HTTP(S) URL in the interactive Preview panel (macOS development build)."),
+    cmd("preview.open", &[opt("target"), opt("targets")], "Open a local PPT/PPTX, PDF, image, HTML or HTTP(S) URL in Preview. Use target for one file, or targets for an explicitly ordered PNG selection."),
     cmd("preview.reload", &[], "Reload the current Preview page."),
-    cmd("preview.view", &[opt("zoom"), opt("fit")], "Set Preview page zoom (0.25–2.0) or automatic width fit."),
+    cmd("preview.view", &[opt("zoom"), opt("fit"), opt("page")], "Set Preview zoom (0.25–2.0), automatic width fit, or a 1-based document page."),
     cmd("browser.tab.new", &[opt("space"), opt("url")], "Open a new Browser page tab, optionally at a website or search."),
     cmd("browser.tab.select", &[opt("space"), req("id")], "Select a Browser page tab by its id from status."),
     cmd("browser.tab.close", &[opt("space"), opt("id")], "Close a Browser page tab (default: active); closing the last leaves a fresh tab."),

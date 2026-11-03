@@ -17,13 +17,14 @@ def run(root, binary, session, full=True, logs=None):
     hc=str(Path.home()/'.local/bin/herdr-core')
     with tempfile.TemporaryDirectory(prefix='herdr-qa-',dir='/private/tmp') as temp:
         qa=Path(temp);(qa/'scripts').mkdir();(qa/'target/debug').mkdir(parents=True)
-        for name in ['browser-smoke.py','preview-smoke.py','browser-focus-smoke.py']:
+        for name in ['browser-smoke.py','preview-smoke.py','browser-focus-smoke.py','document-preview-smoke.py']:
             shutil.copyfile(root/'scripts'/name,qa/'scripts'/name)
         shutil.copytree(root/'examples/preview',qa/'examples/preview')
+        shutil.copytree(root/'tests/fixtures/document-preview',qa/'tests/fixtures/document-preview')
         staged=qa/'target/debug/herdr-app';shutil.copyfile(binary,staged);staged.chmod(0o755)
         home=qa/'.browser-test/app'
         commands=[['python3','scripts/browser-smoke.py','--home',str(home),'--binary',str(staged),'--session',session]]
-        if full:commands += [['python3','scripts/preview-smoke.py','--home',str(home),'--binary',str(staged),'--session',session],['python3','scripts/browser-focus-smoke.py','--session',session]]
+        if full:commands += [['python3','scripts/preview-smoke.py','--home',str(home),'--binary',str(staged),'--session',session],['python3','scripts/browser-focus-smoke.py','--session',session],['python3','scripts/document-preview-smoke.py','--home',str(home),'--binary',str(staged),'--session',session]]
         try:
             for index,argv in enumerate(commands):
                 with (logs/f'native-{index}.log').open('w') as output:

@@ -28,6 +28,7 @@ Rust 1.95.0과 Zig 0.16.0을 사용합니다. `ZIG`로 Zig 실행 경로를 지�
 python3 scripts/package-personal.py
 python3 scripts/audit-public.py
 python3 scripts/test-personal-restore.py
+python3 scripts/test-macos-signing.py
 ```
 
 감사 도구는 Git에 올릴 파일과 앱 압축 파일 내부를 검사합니다. 실제 배포자의 사용자명·이메일 등은
@@ -39,3 +40,5 @@ GitHub에는 검사한 소스와 패키지만 올립니다. `.public-build`, 테
 새 Git 이력을 만들 때 로컬 실명·컴퓨터 이름이 든 커밋 이메일을 사용하지 마세요。
 
 배포 아카이브는 일반화된 임시 서명으로 만듭니다. 설치기는 해당 맥의 전용 인증서로 다시 서명하고 이후 업데이트에도 같은 인증서를 재사용합니다. `Library/Application Support/Herdr Preview/Signing`의 키체인·암호·인증서는 배포본이나 Git에 포함하지 않습니다. 시스템 신뢰 목록이나 전체 디스크 접근 권한은 바꾸지 않습니다.
+
+새 설치 서명 검사는 격리된 임시 키체인에서 현재 OpenSSL과 macOS 기본 도구를 각각 확인합니다. 인증서·비추출 키는 macOS PEM 가져오기를 사용하며 서명하는 동안에만 전용 키체인을 검색 목록에 추가한 뒤 원래 목록으로 돌립니다. 기존 맥의 서명 키와 신뢰 설정은 변경하지 않습니다.

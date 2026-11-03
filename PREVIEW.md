@@ -37,7 +37,11 @@ Browser는 macOS 14 이상에서 앱 설정 폴더별 전용 WebKit 프로필을
 오른쪽 위의 **Preview**를 누르면 작업 결과를 앱 안에서 확인할 수 있습니다.
 HTML은 실제 WKWebView에서 실행되므로 클릭·입력·스크롤이 가능합니다.
 
-- **Files:** 로컬 HTML·이미지·PDF 파일을 누르면 Preview로 엽니다.
+- **Files:** 로컬 PPT/PPTX·PDF·이미지·HTML 파일을 누르면 Preview로 엽니다.
+- **슬라이드·페이지:** PPT는 정적인 슬라이드로, PDF는 페이지별로 표시합니다. 현재/전체 페이지 표시 옆의 번호를 바꾸고 Enter를 누르면 해당 페이지로 이동합니다. 이전·다음 버튼도 사용할 수 있습니다.
+- **PNG 여러 장:** Preview의 **파일** 버튼에서 PNG 여러 개를 함께 선택하면 선택 목록을 한 묶음으로 넘겨 봅니다. 선택하지 않은 같은 폴더의 이미지는 추가하지 않습니다. PNG와 PDF/PPT를 섞은 다중 선택은 지원하지 않습니다.
+- **문서 변환:** PPT/PPTX에는 LibreOffice가 필요합니다(`/Applications/LibreOffice.app` 또는 `~/Applications/LibreOffice.app`). 문서는 이 Mac에서만 변환하며 원본은 바꾸지 않습니다. 누락된 글꼴에 따라 일부 줄바꿈이 달라질 수 있습니다. PDF는 macOS PDFKit으로 정적인 페이지 이미지를 표시합니다.
+- **페이지 유지:** 탭별로 PNG 선택 목록·현재 페이지를 유지하고 다시 시작할 때 복원합니다. 새로고침할 때 문서가 짧아지면 마지막 남은 페이지로 이동합니다. 암호화된 PDF는 잠금을 해제한 사본으로 열어주세요.
 - **파일 열기:** Preview의 파일 선택 버튼으로 결과물을 엽니다.
 - **주소 입력:** 파일 경로나 `http://localhost:3000` 같은 개발 서버 주소를 넣고 Enter를 누릅니다.
 - **자동 갱신:** 로컬 파일과 같은 폴더의 CSS·JavaScript·이미지가 바뀌면 페이지를 다시 불러옵니다. 입력 중에는 자동 갱신을 끌 수 있습니다.
@@ -52,6 +56,8 @@ HTML은 실제 WKWebView에서 실행되므로 클릭·입력·스크롤이 가�
 herdr-preview do preview.open '{"target":"/absolute/path/result.html"}'
 herdr-preview do preview.open '{"target":"http://localhost:3000"}'
 herdr-preview do preview.reload
+herdr-preview do preview.open '{"targets":["/absolute/one.png","/absolute/two.png"]}'
+herdr-preview do preview.view '{"page":2}'
 herdr-preview status
 ```
 

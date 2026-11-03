@@ -146,7 +146,7 @@ export default class Files extends View {
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
         .on_click((_e, cx) => {
           if (entry.dir) this.toggle(path, cx);
-          else if (!this.on && /\.(html?|svg|png|jpe?g|webp|avif|gif|pdf)$/i.test(path)) run("preview.open", { target: `${this.root}/${path}` });
+          else if (!this.on && /\.(html?|svg|png|jpe?g|webp|avif|gif|pdf|pptx?)$/i.test(path)) run("preview.open", { target: `${this.root}/${path}` });
           else this.show(path, cx);
         })
         .child(entry.dir ? svg(`mods/files/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())

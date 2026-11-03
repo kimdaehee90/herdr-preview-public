@@ -1,5 +1,9 @@
 //! Artifact previews and a persistent browser. Pages cannot call Herdr APIs.
 mod tabs;
+#[cfg(target_os = "macos")]
+mod document;
+#[cfg(target_os = "macos")]
+mod paging;
 pub use tabs::PagePanel;
 #[cfg(target_os = "macos")]
 mod automation;
@@ -47,6 +51,9 @@ impl Preview {
     ) {
         let _ =
             reply.send(serde_json::json!({"error":"Browser automation is available on macOS."}));
+    }
+    pub fn open_selection(&mut self, _: &[String], _: &str, _: &mut gpui::Window, _: &mut gpui::Context<Self>) -> Result<(), String> {
+        Err("Document preview is available on macOS.".into())
     }
     pub fn open(
         &mut self,

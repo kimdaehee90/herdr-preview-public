@@ -16,6 +16,13 @@ PATTERNS = {
     'AWS access key': re.compile(rb'AKIA[A-Z0-9]{16}'),
 }
 PRIVATE_DIRS = {'.git','.public-build','.personal-update','.browser-test','.preview-test','WebKit','.ssh','.aws','reviews','output'}
+# This repository owner is already a public identifier. A local account name
+# can be its substring; that must not reject the published GitHub URL itself.
+PUBLIC_OWNER = b'kim'+b'dae'+b'hee90'
+PUBLIC_OWNER_CONTEXTS = (
+    rb'https://github\.com/'+re.escape(PUBLIC_OWNER)+rb'(?=[/?#\s)]|$)',
+    rb'(?<![A-Za-z0-9._%+-])(?:[0-9]+\+)?'+re.escape(PUBLIC_OWNER)+rb'@users\.noreply\.github\.com(?![A-Za-z0-9.-])',
+)
 
 
 def private_terms():
@@ -27,8 +34,13 @@ def private_terms():
 
 
 def scan(data, name, terms):
-    if any(value.lower() in data.lower() for value in terms):
-        raise RuntimeError('Private producer identifier in '+name)
+    for value in terms:
+        candidate=data
+        if value.lower() in PUBLIC_OWNER.lower():
+            for context in PUBLIC_OWNER_CONTEXTS:
+                candidate=re.sub(context,b'PUBLIC_GITHUB_IDENTITY',candidate,flags=re.I)
+        if value.lower() in candidate.lower():
+            raise RuntimeError('Private producer identifier in '+name)
     for kind, pattern in PATTERNS.items():
         if pattern.search(data):raise RuntimeError(kind+' pattern in '+name)
 

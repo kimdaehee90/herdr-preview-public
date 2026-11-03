@@ -37,6 +37,10 @@
     "defaults/mods/workspace-status-personal/main.js",
     "src/preview/tabs.rs",
     "distribution/macos-signing.py",
-    "scripts/native-qa.py"
+    "scripts/native-qa.py",
+    "src/preview/document.rs",
+    "src/preview/document_ui.rs",
+    "src/preview/paging.rs",
+    "scripts/document-preview-smoke.py"
   ]
 }

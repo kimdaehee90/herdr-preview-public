@@ -328,6 +328,9 @@ impl PagePanel {
             .ok_or("No active page")?
             .update(cx, |p, cx| p.open(target, cwd, window, cx))
     }
+    pub fn open_selection(&mut self, targets:&[String], cwd:&str, window:&mut Window, cx:&mut Context<Self>)->Result<(),String> {
+        self.page().ok_or("No active page")?.update(cx,|p,cx|p.open_selection(targets,cwd,window,cx))
+    }
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         if let Some(p) = self.page() {
             p.update(cx, |p, cx| p.reload(cx));

@@ -174,11 +174,12 @@ End a terminal and its sub-agents.
 
 ## `preview.open`
 
-Open a local HTML/image file or HTTP(S) URL in the interactive Preview panel (macOS development build).
+Open a local PPT/PPTX, PDF, image, HTML or HTTP(S) URL in Preview. Use target for one file, or targets for an explicitly ordered PNG selection.
 
 | Argument | Required |
 |---|---|
-| `target` | yes |
+| `target` | no |
+| `targets` | no |
 
 ## `preview.reload`
 
@@ -188,12 +189,13 @@ No arguments.
 
 ## `preview.view`
 
-Set Preview page zoom (0.25–2.0) or automatic width fit.
+Set Preview zoom (0.25–2.0), automatic width fit, or a 1-based document page.
 
 | Argument | Required |
 |---|---|
 | `zoom` | no |
 | `fit` | no |
+| `page` | no |
 
 ## `browser.tab.new`
 

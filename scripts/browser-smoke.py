@@ -299,8 +299,11 @@ try:
  do('browser.view',zoom=.9,mobile=True)
  read_ready()
  do('app.quit');process.wait(timeout=10)
- start();do('browser.open');data=read_ready()
- assert any('저장 상태: survived / qa-cookie=survived' in f.get('text','') for f in data['frames'])
+ start();do('browser.open')
+ def restored_persistence_ready():
+  data=read_ready()
+  return data if any('저장 상태: survived / qa-cookie=survived' in f.get('text','') for f in data.get('frames',[])) else None
+ data=wait(restored_persistence_ready,'Persistent Browser profile did not finish restoring')
  assert status()['browser']['mobile'] and status()['browser']['page_zoom']==.9 and not status()['browser']['fit_width']
  passed('Persistent Browser profile survives app restart')
  passed('Page zoom, fit choice and mobile mode survive app restart')

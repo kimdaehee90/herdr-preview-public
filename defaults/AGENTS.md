@@ -202,7 +202,23 @@ draft does not by itself request publication. Some cross-origin frames and
 custom editors may need direct user interaction; verify the real site's result.
 
 The main layout's Preview button opens a native WKWebView beside the terminals.
-`preview.open {target}` opens a local HTML/image/PDF file or HTTP(S) URL;
+`preview.open {target}` opens a local PPT/PPTX, PDF, PNG, HTML/image file or HTTP(S) URL;
+`preview.open {targets: [absolutePath1, absolutePath2]}` opens explicitly selected
+PNG files as one paginated collection, in the supplied order. Use target or targets,
+not both. The file picker allows multiple PNGs; unselected neighbors are not added.
+PPT/PPTX conversion is local and requires LibreOffice under /Applications or
+~/Applications (or HERDR_PREVIEW_SOFFICE for a development converter). Slides are
+static; original documents are unchanged. PDF pages are rendered locally with
+PDFKit; encrypted PDFs must be unlocked in a separate copy first.
+The document toolbar shows current/total pages with previous/next and an editable
+page number: Enter jumps to that page. `preview.view {page: 3}` does the same.
+Invalid/out-of-range page requests retain the last verified page. PNG collections
+and page choices stay independent per artifact tab and restore after app restart.
+Reload keeps the current page when possible and clamps if a PDF has fewer pages.
+Preview status includes page, pages, files and document_loading. Width fit and zoom
+continue to work for static pages. PDF text selection/search and slide animations
+are outside this static viewer. Local files are never sent to a conversion service.
+
 `preview.reload` reloads it. Files opens supported local artifacts there on click.
 The address field accepts a path or a development server URL; Enter opens it.
 The toolbar offers a file picker, back, forward, reload and local file auto-refresh.

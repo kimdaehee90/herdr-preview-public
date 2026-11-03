@@ -1,4 +1,8 @@
 use super::server::Server;
+use super::document::Document;
+#[path = "document_ui.rs"]
+mod document_ui;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use crate::{mods, settings};
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
@@ -19,6 +23,8 @@ enum Event {
     Popup(String),
     Title(String),
     Resized,
+    DocumentReady(u64, Result<(Arc<Document>, usize, PathBuf), String>),
+    PageReady(u64, Result<(usize, PathBuf), String>),
     FitMeasured(u64, f64, f64, u8),
 }
 
@@ -90,15 +96,27 @@ impl Drop for Browser {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+struct ArtifactLocation { target: String, sources: Vec<String> }
+
 pub struct Preview {
     pub(super) is_browser: bool,
     space: String,
     cwd: String,
     input: Entity<InputState>,
+    page_input: Entity<InputState>,
+    document: Option<Arc<Document>>,
+    document_sources: Vec<PathBuf>,
+    document_page: usize,
+    document_requested_page: usize,
+    document_epoch: u64,
+    document_pending: bool,
+    document_cancel: Arc<AtomicBool>,
+    _page_subscription: Subscription,
     pub(super) browser: Rc<RefCell<Browser>>,
     events: async_channel::Sender<Event>,
     server: Option<Server>,
-    history: Vec<String>,
+    history: Vec<ArtifactLocation>,
     history_at: usize,
     watcher: Option<notify::RecommendedWatcher>,
     target: String,
@@ -173,6 +191,9 @@ pub(super) fn target(value: &str, cwd: &str) -> Result<String, String> {
                 Path::new(cwd).join(p)
             }
         });
+    if super::document::is_document(&path) {
+        return super::document::checked_source_path(&path).map(|p|p.to_string_lossy().into_owned());
+    }
     let path = path
         .canonicalize()
         .map_err(|_| "파일을 찾을 수 없습니다. 경로를 확인하세요.")?;
@@ -196,10 +217,12 @@ pub(super) fn target(value: &str, cwd: &str) -> Result<String, String> {
             | "avif"
             | "gif"
             | "pdf"
+            | "ppt"
+            | "pptx"
             | "txt"
             | "md"
     ) {
-        return Err("HTML·이미지·PDF·텍스트 파일을 미리볼 수 있습니다.".into());
+        return Err("PPT·PPTX·PDF·이미지·HTML·텍스트 파일을 미리볼 수 있습니다.".into());
     }
     Ok(path.to_string_lossy().into_owned())
 }
@@ -234,13 +257,17 @@ impl Preview {
             InputState::new(window, cx).placeholder(if is_browser {
                 "검색어 또는 웹사이트 주소"
             } else {
-                "HTML 경로 또는 http://localhost:3000"
+                "PPT·PDF·이미지 경로 또는 http://localhost:3000"
             })
         });
         let subscription = cx.subscribe_in(&input, window, |this, _, event, window, cx| {
             if matches!(event, InputEvent::PressEnter { .. }) {
                 this.navigate_input(window, cx);
             }
+        });
+        let page_input = cx.new(|cx| InputState::new(window, cx).placeholder("1"));
+        let page_subscription = cx.subscribe_in(&page_input, window, |this, _, event, _, cx| {
+            if matches!(event, InputEvent::PressEnter { .. }) { this.jump_document_input(cx); }
         });
         let (tx, rx) = async_channel::unbounded();
         let events = cx.spawn_in(window, async move |this, cx| {
@@ -254,11 +281,24 @@ impl Preview {
                 if this
                     .update_in(cx, |this: &mut Self, window, cx| {
                         match event {
+                            Event::DocumentReady(epoch, result) => {
+                                if epoch == this.document_epoch { this.finish_document(result, window, cx); }
+                            }
+                            Event::PageReady(epoch, result) => {
+                                if epoch == this.document_epoch {
+                                    match result {
+                                        Ok((page,image)) => if let Err(error)=this.show_document_image(page,&image,window,cx) {this.error=Some(error);this.loading=false;},
+                                        Err(error) => {this.error=Some(error);this.loading=false;}
+                                    }
+                                }
+                            }
                             Event::Loading(url) => {
+                                if !this.document_sources.is_empty() && (this.document_pending || url != this.url) { return; }
                                 this.url = url;
                                 this.start_loading(cx);
                             }
                             Event::Loaded(url) => {
+                                if !this.document_sources.is_empty() && (this.document_pending || url != this.url) { return; }
                                 this.loading = false;
                                 this.url = url.clone();
                                 this.error = None;
@@ -288,6 +328,7 @@ impl Preview {
                                 }
                             }
                             Event::Title(title) => {
+                                if !this.document_sources.is_empty() { return; }
                                 this.title = title.chars().take(200).collect();
                                 this.save_view();
                             }
@@ -322,6 +363,15 @@ impl Preview {
             space: space.into(),
             cwd: mods::home().to_string_lossy().into_owned(),
             input,
+            page_input,
+            document: None,
+            document_sources: Vec::new(),
+            document_page: 0,
+            document_requested_page: 1,
+            document_epoch: 0,
+            document_pending: false,
+            document_cancel: Arc::new(AtomicBool::new(false)),
+            _page_subscription: page_subscription,
             browser: Rc::new(RefCell::new(Browser {
                 view: None,
                 allowed: false,
@@ -357,6 +407,10 @@ impl Preview {
     }
 
     pub fn context_initial(&mut self, cwd: &str, target: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.is_browser && !self.restored {
+            let saved: Value=std::fs::read_to_string(self.state_path()).ok().and_then(|s|serde_json::from_str(&s).ok()).unwrap_or(json!({}));
+            if target.is_some() && saved[&self.space].as_str()==target {self.context(cwd,window,cx);return;}
+        }
         if let Some(target) = target.filter(|_| !self.restored) {
             self.restored = true;
             self.cwd = cwd.into();
@@ -382,7 +436,12 @@ impl Preview {
             self.fit_width = view["fit"].as_bool().unwrap_or(true);
             self.mobile = self.is_browser && view["mobile"].as_bool().unwrap_or(false);
             if let Some(last) = saved[&self.space].as_str() {
-                let _ = self.open(last, cwd, window, cx);
+                let files:Vec<PathBuf>=view["files"].as_array().into_iter().flatten().filter_map(Value::as_str).map(PathBuf::from).collect();
+                if !self.is_browser && !files.is_empty() && files[0].to_str()==Some(last) && files.iter().all(|p|p.is_absolute() && super::document::is_document(p)) && self.ensure_browser(window).is_ok() {
+                    self.target=last.into();
+                    self.input.update(cx,|i,cx|i.set_value(last.to_owned(),window,cx));
+                    self.begin_document(files,view["page"].as_u64().unwrap_or(1) as usize,cx);
+                } else {let _ = self.open(last, cwd, window, cx);}
             } else if self.is_browser {
                 let _ = self.open("https://blog.naver.com/", cwd, window, cx);
             }
@@ -411,7 +470,7 @@ impl Preview {
             saved["_view"] = json!({});
         }
         saved["_view"][&self.space] =
-            json!({"zoom":self.page_zoom,"fit":self.fit_width,"mobile":self.mobile,"title":self.title});
+            json!({"zoom":self.page_zoom,"fit":self.fit_width,"mobile":self.mobile,"title":self.title,"files":self.document_sources,"page":self.document_requested_page.max(1)});
         let _ = crate::persist::write_atomic(&path, serde_json::to_string_pretty(&saved).unwrap());
     }
 
@@ -525,6 +584,11 @@ impl Preview {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<(), String> {
+        if let Some(page)=args.get("page") {
+            if self.is_browser {return Err("페이지 이동은 Preview 문서에서만 사용할 수 있습니다.".into());}
+            let page=page.as_u64().and_then(|p|usize::try_from(p).ok()).ok_or("정수 페이지 번호를 입력하세요.")?;
+            self.request_document_page(page,cx)?;
+        }
         if let Some(zoom) = args.get("zoom") {
             let zoom = zoom
                 .as_f64()
@@ -656,6 +720,16 @@ impl Preview {
         };
         let target = target(&value, cwd)?;
         self.ensure_browser(window)?;
+        if !self.is_browser && !network_url(&target) && super::document::is_document(Path::new(&target)) {
+            self.remember_artifact(&target, &[]);
+            self.target=target.clone();
+            self.title=Path::new(&target).file_name().unwrap_or_default().to_string_lossy().into_owned();
+            self.input.update(cx,|i,cx|i.set_value(target.clone(),window,cx));
+            self.begin_document(vec![PathBuf::from(target)],1,cx);
+            self.save_view(); return Ok(());
+        }
+        self.document_cancel.store(true,Ordering::Relaxed);
+        self.document_epoch+=1;self.document=None;self.document_sources.clear();self.document_page=0;self.document_pending=false;
         let previous = self.server.take();
         let target = previous.as_ref().and_then(|server| server.target_for_url(&target))
             .map(|p| p.to_string_lossy().into_owned()).unwrap_or(target);
@@ -715,15 +789,7 @@ impl Preview {
             }
         }
         self.server = server;
-        if !self.is_browser && self.history.get(self.history_at) != Some(&target) {
-            self.history.truncate(if self.history.is_empty() {
-                0
-            } else {
-                self.history_at + 1
-            });
-            self.history.push(target.clone());
-            self.history_at = self.history.len() - 1;
-        }
+        if !self.is_browser { self.remember_artifact(&target, &[]); }
         self.target = target.clone();
         self.url = url;
         self.dirty = false;
@@ -764,17 +830,16 @@ impl Preview {
         let paths = cx.prompt_for_paths(PathPromptOptions {
             files: true,
             directories: false,
-            multiple: false,
+            multiple: !self.is_browser,
             prompt: Some("Preview에서 열기".into()),
         });
         cx.spawn_in(window, async move |this, cx| {
             let paths = paths.await;
             let _ = this.update_in(cx, |this, window, cx| {
                 if let Ok(Ok(Some(paths))) = paths {
-                    if let Some(path) = paths.first() {
-                        let cwd = this.cwd.clone();
-                        let _ = this.open(&path.to_string_lossy(), &cwd, window, cx);
-                    }
+                    let values:Vec<String>=paths.iter().map(|p|p.to_string_lossy().into_owned()).collect();
+                    let cwd=this.cwd.clone();
+                    let _=this.open_selection(&values,&cwd,window,cx);
                 }
                 this.allow(true);
                 cx.notify();
@@ -784,6 +849,10 @@ impl Preview {
     }
 
     pub fn reload(&mut self, cx: &mut Context<Self>) {
+        if !self.document_sources.is_empty() {
+            self.begin_document(self.document_sources.clone(),self.document_requested_page.max(1),cx);
+            return;
+        }
         let result = self
             .browser
             .borrow()
@@ -803,7 +872,7 @@ impl Preview {
     pub fn status(&self) -> Value {
         json!({"supported": true, "target": self.target, "url": self.url, "loading": self.loading,
             "error": self.error, "auto_reload": self.auto, "visible": self.browser.borrow().shown,
-            "persistent": self.is_browser,"page_zoom":self.page_zoom,"fit_width":self.fit_width,"mobile":self.mobile,"title":self.title})
+            "persistent": self.is_browser,"page_zoom":self.page_zoom,"fit_width":self.fit_width,"mobile":self.mobile,"title":self.title,"page":self.document_page,"pages":self.document.as_ref().map_or(0,|d|d.page_count()),"files":self.document_sources,"document_loading":self.document_pending})
     }
 
     fn step_zoom(&mut self, increase: bool, window: &mut Window, cx: &mut Context<Self>) {
@@ -835,16 +904,24 @@ impl Preview {
         }
     }
 
+    fn remember_artifact(&mut self, target:&str, sources:&[String]) {
+        let location=ArtifactLocation{target:target.into(),sources:sources.to_vec()};
+        if self.history.get(self.history_at)==Some(&location){return;}
+        self.history.truncate(if self.history.is_empty(){0}else{self.history_at+1});
+        self.history.push(location); self.history_at=self.history.len()-1;
+    }
+
     pub fn navigate_artifact_history(
         &mut self,
         forward: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.is_browser || self.history.len() < 2 {
+        if self.is_browser || (self.history.len() < 2 && self.document_sources.is_empty()) {
             self.navigate_history(forward);
             return;
         }
+        if self.history.len() < 2 { return; }
         let next = if forward {
             self.history_at
                 .checked_add(1)
@@ -855,11 +932,12 @@ impl Preview {
         let Some(next) = next else { return };
         let previous = self.history_at;
         self.history_at = next;
-        let target = self.history[next].clone();
+        let location = self.history[next].clone();
         let cwd = self.cwd.clone();
-        if self.open(&target, &cwd, window, cx).is_err() {
-            self.history_at = previous;
-        }
+        let result = if location.sources.len()>1 {
+            self.open_selection(&location.sources,&cwd,window,cx)
+        } else { self.open(&location.target,&cwd,window,cx) };
+        if result.is_err() { self.history_at = previous; }
     }
 
     // Only the isolated debug smoke harness can request page evaluation.
@@ -908,7 +986,7 @@ impl Render for Preview {
             self.reload(cx);
         }
         let browser = self.browser.clone();
-        let has_page = self.browser.borrow().view.is_some() && !self.target.is_empty();
+        let has_page = self.browser.borrow().view.is_some() && !self.target.is_empty() && !self.document_pending && (self.document_sources.is_empty() || self.document_page>0);
         div()
             .id("artifact-preview")
             .size_full()
@@ -963,6 +1041,7 @@ impl Render for Preview {
                         .rounded(px(5.)).bg(color("input")).child(Input::new(&self.input)))
                     .child(self.button("preview-go","열기",cx,|this,w,cx|this.navigate_input(w,cx))),
             )
+            .when(!self.is_browser && !self.document_sources.is_empty(), |d|d.child(self.document_controls(cx)))
             .when(self.error.is_some(), |d| {
                 d.child(
                     div()
@@ -1005,7 +1084,7 @@ impl Render for Preview {
                     .child(
                         div()
                             .text_size(px(12.))
-                            .child("HTML·이미지 파일을 열거나 개발 서버 주소를 입력하세요."),
+                            .child("PPT·PDF·이미지 파일을 열거나 개발 서버 주소를 입력하세요."),
                     )
                     .child(
                         div()
@@ -1021,6 +1100,16 @@ impl Render for Preview {
 mod tests {
     use super::{network_url, target};
     #[test]
+    fn accepts_office_documents_as_local_preview_targets() {
+        let root=std::env::temp_dir().join(format!("herdr-office-targets-{}",std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for name in ["deck.ppt","deck.pptx"] {
+            let path=root.join(name);std::fs::write(&path,b"fixture").unwrap();
+            assert!(target(path.to_str().unwrap(),"/").is_ok());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn accepts_only_web_urls_and_existing_supported_files() {
         assert!(network_url("http://localhost:3000"));
         assert!(!network_url("javascript:alert(1)"));
@@ -1033,4 +1122,8 @@ mod tests {
         assert!(target("javascript://alert(1)", "/tmp").is_err());
         assert!(target("/definitely/missing.html", "/tmp").is_err());
     }
+}
+
+impl Drop for Preview {
+    fn drop(&mut self) {self.document_cancel.store(true,Ordering::Relaxed);}
 }

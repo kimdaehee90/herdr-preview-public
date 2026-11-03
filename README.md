@@ -1,7 +1,7 @@
 # Herdr Preview · Browser
 
 터미널 옆에서 작업 결과를 미리 보고 웹사이트를 조작할 수 있는 Herdr 확장 버전입니다.
-**Browser·Preview 탭, 스페이스/워크트리별 Browser, 한국어 글꼴과 개인 화면 배치**를 포함합니다.
+**PPT/PDF·여러 PNG 미리보기와 페이지 이동, Browser·Preview 탭, 스페이스/워크트리별 Browser, 한국어 글꼴과 개인 화면 배치**를 포함합니다.
 원본은 [herdrdev/herdr-app](https://github.com/herdrdev/herdr-app)입니다.
 
 ## 다른 맥북에 설치
@@ -16,6 +16,9 @@ git clone --depth 1 https://github.com/kimdaehee90/herdr-preview-public.git "$HO
 
 GitHub 로그인 없이 설치할 수 있습니다. 설치 후 오른쪽 위의 **Preview** 또는 **Browser**를 누르세요.
 기본 앱 설치 방법은 [원본 저장소 안내](https://github.com/herdrdev/herdr-app#install)를 참고하세요.
+PPT/PPTX를 보려면 LibreOffice도 필요합니다. 이미 설치되어 있으면 그대로 사용하며,
+없다면 [공식 LibreOffice](https://www.libreoffice.org/download/download-libreoffice/)를
+응용 프로그램 폴더에 설치하세요. PDF와 PNG는 추가 변환 도구 없이 사용할 수 있습니다.
 
 ## 이미 설치했다면 업데이트
 
@@ -27,10 +30,14 @@ git -C "$HOME/.local/share/herdr-preview-public" pull --ff-only && bash "$HOME/.
 
 설치기는 이전 앱과 설정을 백업하며, 기존 Browser 탭 목록과 이 맥의 로그인 프로필을 유지합니다.
 코어를 교체하거나 재시작하지 않습니다.
+위 새 설치·업데이트 명령 모두 저장소에 함께 배포된 최신 앱 패키지를 설치합니다.
+이번 문서 미리보기·페이지 이동 기능도 같은 명령으로 적용됩니다.
 
 ## 포함한 기능
 
-- **Preview:** HTML·이미지·PDF·개발 서버 결과물. `+`로 탭 추가, 클릭으로 전환, `×`로 닫기.
+- **Preview:** PPT/PPTX 정적 슬라이드·PDF·이미지·HTML·개발 서버 결과물. `+`로 탭 추가, 클릭으로 전환, `×`로 닫기.
+- **문서 페이지:** 현재/전체 페이지, 이전·다음 버튼, 번호 입력 후 Enter로 바로 이동. 기존 맞춤·확대/축소 유지.
+- **여러 PNG:** Preview의 파일 선택창에서 여러 장을 고르면 선택한 목록을 순서대로 넘겨 봅니다. 탭별 이미지 목록·현재 페이지를 유지하고 앱을 다시 열 때 복원합니다.
 - **Browser:** 웹사이트 탭, 로그인 유지, 클릭·한글 입력·사진 업로드.
 - **작업 공간별 Browser:** 스페이스나 워크트리를 바꾸면 해당 작업의 Browser와 탭들이 표시됩니다.
 - **AI별 담당 탭:** 각 AI가 자신의 스페이스·탭을 지정해 다른 편집기에 동시에 입력할 수 있습니다.
